@@ -1,0 +1,19 @@
+# --- Clinical Data (STRICT PRIVACY) ---
+*.csv
+*.txt
+*.TXT
+
+# --- Processed Binary Files (Too large / Internal use) ---
+*.npy
+*.pth
+
+# --- Python Environment & Junk ---
+__pycache__/
+.venv/
+.env
+.ipynb_checkpoints/
+*.pyc
+
+# --- OS specific ---
+.DS_Store
+Thumbs.db
