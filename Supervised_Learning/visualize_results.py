@@ -7,7 +7,7 @@ from train_lstm import PentaLSTM
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TIME_SEC = 10510  # Type the exact second you want to check!
+TARGET_TIME_SEC = 10490  # Type the exact second you want to check!
 # ==========================================
 
 print("1. Loading Data...")

@@ -4,7 +4,7 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data\ON030217-06.TXT'  # <-- Put the name of your doctor's text file here
+TXT_FILE_PATH = 'Data\ON030217-06.TXT'  
 SEGMENT_TIMES_PATH = 'segment_times.npy'
 # ==========================================
 
@@ -83,7 +83,6 @@ for i in range(num_segments):
     # Check every doctor event
     for start_t, end_t, event_class in events:
         
-        # 🌟 THE MAGIC TRICK 🌟
         # Find exactly which indices in this window fall inside the doctor's start and end times.
         # This completely ignores "stitched gaps" because it looks at the absolute timestamp!
         overlap_mask = (window_time_axis >= start_t) & (window_time_axis <= end_t)

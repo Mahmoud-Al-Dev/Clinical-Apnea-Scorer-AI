@@ -14,7 +14,6 @@ class ActorCriticLSTM(nn.Module):
             bidirectional=True
         )
         
-        # CHANGED: 1. THE ACTOR HEAD
         # Outputs shape: (Batch, 960, 3) -> Logits for Normal, CA, and OH
         self.actor_head = nn.Linear(hidden_size * 2, 3)
         

@@ -3,7 +3,6 @@ import numpy as np
 from gymnasium import spaces
 
 class ApneaEnv(gym.Env):
-    # CHANGED: Defaulting to the new Master Dataset
     def __init__(self, x_path='X_train_PentaLSTM.npy', y_path='Y_train_Labels.npy'):
         super(ApneaEnv, self).__init__()
         
@@ -37,7 +36,7 @@ class ApneaEnv(gym.Env):
         target = self.Y[self.current_step].flatten()
         
         # Count the scenarios
-        correct_normal = np.sum((action == target) & (target == 0)) # BROUGHT THIS BACK!
+        correct_normal = np.sum((action == target) & (target == 0)) 
         correct_apnea = np.sum((action == target) & (target > 0))
         missed_apnea = np.sum((action == 0) & (target > 0))
         false_alarm = np.sum((action > 0) & (target == 0))
@@ -49,7 +48,7 @@ class ApneaEnv(gym.Env):
         # Normalize the environment reward
         step_reward = step_reward / 960.0
         
-        # (Tip 3) ONE SEGMENT = ONE EPISODE. Terminate immediately after 1 step.
+        #ONE SEGMENT = ONE EPISODE. Terminate immediately after 1 step.
         terminated = True 
         truncated = False
         

@@ -2,7 +2,6 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-# IMPORTANT: We import the new Actor-Critic brain!
 from actor_critic_lstm import ActorCriticLSTM
 
 # ==========================================
@@ -34,7 +33,6 @@ print("4. Making Prediction...")
 input_tensor = torch.tensor(X[seg_idx], dtype=torch.float32).unsqueeze(0)
 
 with torch.no_grad():
-    # The new model outputs TWO things. We only care about the Actor's logits.
     action_logits, state_value = model(input_tensor)
     
     # Apply softmax and argmax for multi-class prediction
