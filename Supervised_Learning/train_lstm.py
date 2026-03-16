@@ -4,8 +4,12 @@ import numpy as np
 from torch.utils.data import Dataset, DataLoader
 
 # =================================================================
-# 1. THE DATASET CLASS (The Loader)
+# --- USER CONTROLS ---
 # =================================================================
+# Change this to 'OSA' or 'CA' to train the specific model!
+TARGET_TYPE = 'CA' 
+# =================================================================
+
 class ApneaDataset(Dataset):
     def __init__(self, x_file, y_file):
         self.x = torch.tensor(np.load(x_file), dtype=torch.float32)
@@ -14,9 +18,7 @@ class ApneaDataset(Dataset):
         
     def __len__(self): return len(self.x)
     def __getitem__(self, idx): return self.x[idx], self.y[idx]
-# =================================================================
-# 2. THE PENTA-LSTM ARCHITECTURE (The Brain)
-# =================================================================
+
 class PentaLSTM(nn.Module):
     def __init__(self, input_size=6, hidden_size=128, num_layers=2):
         super(PentaLSTM, self).__init__()
@@ -28,33 +30,31 @@ class PentaLSTM(nn.Module):
             bidirectional=True 
         )
         
-        # CHANGED: Output 3 classes (0=Normal, 1=CA, 2=OH) instead of 1
-        self.fc = nn.Linear(hidden_size * 2, 3)
+        # CHANGED: Output 2 classes (0=Normal Breathing, 1=Apnea Event)
+        self.fc = nn.Linear(hidden_size * 2, 2)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
         predictions = self.fc(lstm_out) 
         
-        # CHANGED: PyTorch CrossEntropy expects shape: (Batch, Classes, Timesteps)
-        # We must swap the 'Classes' (dim 2) and 'Timesteps' (dim 1)
+        # PyTorch CrossEntropy expects shape: (Batch, Classes, Timesteps)
         predictions = predictions.permute(0, 2, 1)
         
         return predictions
 
-# =================================================================
-# 3. THE TRAINING ENGINE
-# =================================================================
 def train_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Training Multi-Class SFT on {device}...")
+    print(f"Training Binary SFT for {TARGET_TYPE} on {device}...")
     
-    dataset = ApneaDataset('X_train_PentaLSTM.npy', 'Y_train_Labels.npy')
+    # Dynamically load the correct label file based on TARGET_TYPE
+    y_filename = f'Y_train_Labels_{TARGET_TYPE}.npy'
+    dataset = ApneaDataset('X_train_PentaLSTM.npy', y_filename)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     
     model = PentaLSTM().to(device)
     
-    # Heavily penalize the AI if it misses an apnea!
-    class_weights = torch.tensor([1, 35, 35], dtype=torch.float32).to(device)
+    # CHANGED: Only 2 weights now. Class 0 gets weight 1, Class 1 gets weight 35.
+    class_weights = torch.tensor([1.0, 80], dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -72,6 +72,9 @@ def train_model():
             epoch_loss += loss.item()
         print(f"Epoch {epoch+1}/{epochs} | Loss: {epoch_loss/len(dataloader):.4f}")
 
-    torch.save(model.state_dict(), 'penta_lstm_weights.pth')
+    # Dynamically save the weights so they don't overwrite each other!
+    save_name = f'penta_lstm_{TARGET_TYPE}_weights.pth'
+    torch.save(model.state_dict(), save_name)
+    print(f"✅ Saved weights to {save_name}")
 
 if __name__ == "__main__": train_model()

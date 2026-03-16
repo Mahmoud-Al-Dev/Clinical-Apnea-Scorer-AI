@@ -4,7 +4,7 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data\ON030217-06.TXT'  
+TXT_FILE_PATH = 'Data\ON020217-06.TXT'  
 SEGMENT_TIMES_PATH = 'segment_times.npy'
 # ==========================================
 
@@ -18,7 +18,8 @@ segment_times = np.load(SEGMENT_TIMES_PATH)
 num_segments, num_timesteps = segment_times.shape
 
 print("2. Parsing doctor's clinical notes...")
-events = []
+events_ca = []
+events_osa = []
 
 # Open and parse the text file
 with open(TXT_FILE_PATH, 'r', encoding='latin-1') as file:
@@ -35,7 +36,7 @@ for line in lines:
     # If we are inside the table, parse the data
     if in_respiratory_section:
         # Stop parsing if we hit an empty line or a new section
-        if not line.strip() and len(events) > 0:
+        if not line.strip() and (len(events_ca) > 0 or len(events_osa) > 0):
             break
             
         # Skip the dashed border lines or header rows
@@ -55,49 +56,46 @@ for line in lines:
                 
                 event_str = parts[6].strip()
                 
-                # Map the text to your AI classes
+                # Route the event to the correct list
                 if event_str == 'CA':
-                    event_class = 1
-                elif event_str == 'OH' or event_str == 'OA': # Added OA (Obstructive Apnea) just in case!
-                    event_class = 2
+                    events_ca.append((start_t, end_t))
+                elif event_str in ['OH', 'OA']: # Catching both Obstructive Hypopnea and Apnea
+                    events_osa.append((start_t, end_t))
                 else:
-                    continue # Skip anything else we don't care about right now
-                
-                events.append((start_t, end_t, event_class))
+                    continue # Skip everything else
                 
             except ValueError:
                 # This catches any weird lines that don't have numbers where numbers should be
                 continue
 
-print(f"   Found {len(events)} valid clinical events (CA/OH).")
+print(f"   Found {len(events_ca)} CA events and {len(events_osa)} OSA events.")
 
 print("3. Syncing clinical events to AI time segments...")
-# Initialize the target tensor with zeros (Class 0 = Normal Breathing)
-Y_labels = np.zeros((num_segments, num_timesteps, 1), dtype=np.int32)
+# Initialize TWO target tensors with zeros (Class 0 = Normal Breathing)
+Y_labels_CA = np.zeros((num_segments, num_timesteps, 1), dtype=np.int32)
+Y_labels_OSA = np.zeros((num_segments, num_timesteps, 1), dtype=np.int32)
 
 # Loop through every 30-second AI window
 for i in range(num_segments):
-    # This array holds the 960 exact timestamps for this specific window
     window_time_axis = segment_times[i] 
     
-    # Check every doctor event
-    for start_t, end_t, event_class in events:
-        
-        # Find exactly which indices in this window fall inside the doctor's start and end times.
-        # This completely ignores "stitched gaps" because it looks at the absolute timestamp!
+    # --- Apply CA Targets ---
+    for start_t, end_t in events_ca:
         overlap_mask = (window_time_axis >= start_t) & (window_time_axis <= end_t)
-        
-        # Assign the class (1 or 2) to those specific pixels
         if np.any(overlap_mask):
-            Y_labels[i, overlap_mask, 0] = event_class
+            Y_labels_CA[i, overlap_mask, 0] = 1 # Mark 1 for CA
 
-print("4. Saving Y_train_Labels.npy...")
-np.save('Y_train_Labels.npy', Y_labels)
+    # --- Apply OSA Targets ---
+    for start_t, end_t in events_osa:
+        overlap_mask = (window_time_axis >= start_t) & (window_time_axis <= end_t)
+        if np.any(overlap_mask):
+            Y_labels_OSA[i, overlap_mask, 0] = 1 # Mark 1 for OSA
+
+print("4. Saving Y_train_Labels_CA.npy and Y_train_Labels_OSA.npy...")
+np.save('Y_train_Labels_CA.npy', Y_labels_CA)
+np.save('Y_train_Labels_OSA.npy', Y_labels_OSA)
 
 # Print a quick summary to prove it worked
-total_ca = np.sum(Y_labels == 1)
-total_oh = np.sum(Y_labels == 2)
 print(f"✅ SUCCESS!")
-print(f"   Y_train shape: {Y_labels.shape}")
-print(f"   Total CA (Class 1) data points assigned: {total_ca}")
-print(f"   Total OH (Class 2) data points assigned: {total_oh}")
+print(f"   CA Array shape:  {Y_labels_CA.shape} | Total CA data points:  {np.sum(Y_labels_CA == 1)}")
+print(f"   OSA Array shape: {Y_labels_OSA.shape} | Total OSA data points: {np.sum(Y_labels_OSA == 1)}")

@@ -14,8 +14,8 @@ class ActorCriticLSTM(nn.Module):
             bidirectional=True
         )
         
-        # Outputs shape: (Batch, 960, 3) -> Logits for Normal, CA, and OH
-        self.actor_head = nn.Linear(hidden_size * 2, 3)
+        # CHANGED: Output 2 classes (0=Normal, 1=Apnea)
+        self.actor_head = nn.Linear(hidden_size * 2, 2)
         
         # 2. THE CRITIC HEAD
         self.critic_head = nn.Linear(hidden_size * 2, 1)
@@ -24,8 +24,7 @@ class ActorCriticLSTM(nn.Module):
         lstm_out, _ = self.lstm(x)  
         action_logits = self.actor_head(lstm_out)
         
-        # FIX: The .detach() shield! 
-        # The Critic can see the memory, but its gradients cannot flow backward and destroy the LSTM.
+        # The .detach() shield!
         summary_vector = torch.mean(lstm_out.detach(), dim=1) 
         state_value = self.critic_head(summary_vector) 
         
@@ -34,8 +33,8 @@ class ActorCriticLSTM(nn.Module):
 # =================================================================
 # TRANSFER LEARNING UTILITY
 # =================================================================
-def load_pretrained_supervised_weights(rl_model, weights_path='penta_lstm_weights.pth', device='cpu'):
-    print(f"Loading SFT weights from {weights_path}...")
+def load_pretrained_supervised_weights(rl_model, weights_path, device='cpu'):
+    print(f"Loading Binary SFT weights from {weights_path}...")
     pretrained_dict = torch.load(weights_path, map_location=device, weights_only=True)
     rl_dict = rl_model.state_dict()
     
@@ -48,5 +47,5 @@ def load_pretrained_supervised_weights(rl_model, weights_path='penta_lstm_weight
             rl_dict['actor_head.bias'] = v
 
     rl_model.load_state_dict(rl_dict)
-    print("✅ Successfully transplanted BOTH the LSTM memory and Multi-Class Actor Policy!")
+    print("✅ Successfully transplanted BOTH the LSTM memory and Binary Actor Policy!")
     return rl_model
