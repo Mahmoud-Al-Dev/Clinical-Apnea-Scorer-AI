@@ -249,9 +249,11 @@ core_indices = [8, 11, 14, 15, 16, 17]
 # We extract ONLY these from the NORMALIZED segments
 X_train = normalized_segments[:, :, core_indices]
 
-# Save ONLY the features to disk
+# Save BOTH the features and the time alignments to disk!
 np.save('X_train_PentaLSTM.npy', X_train)
+np.save('segment_times.npy', segment_times) # <--- ADDED THIS LINE
 
 print(f"\n✅ SUCCESS! Preprocessing complete.")
 print(f"   X_train saved: {X_train.shape} (Segments, Time-Steps, Channels)")
+print(f"   segment_times saved: {segment_times.shape}")
 print("   Ready for clinical label synchronization script.")

@@ -62,25 +62,18 @@ def train_ppo_rlhf():
             mean_confidence = max_probs.mean().item()
             human_bonus = 0.0 
             
-            if epoch < WARM_UP_EPOCHS:
-                current_max_questions = 5
-            else:
-                current_max_questions = 3
+            # Keep max questions consistent throughout training
+            current_max_questions = MAX_QUESTIONS_PER_EPOCH
 
             ask_for_help = False
             
-            # Extract ground truth to prevent the AI from hiding
-            target_numpy = info["target"]
-            true_apnea_present = np.sum(target_numpy == 1) > 30
-            
             if questions_asked_this_epoch < current_max_questions:
+                # 1. Did the AI actually draw red lines?
                 ai_found_apnea = np.sum(plot_action_numpy == 1) > 30
                 
-                if epoch < WARM_UP_EPOCHS:
-                    # CHANGED: Force a question if the AI guessed it OR if there is a real event!
-                    if ai_found_apnea or true_apnea_present: ask_for_help = True
-                else:
-                    if ai_found_apnea and mean_confidence < 0.99: ask_for_help = True
+                # 2. THE OLD SYSTEM: Only ask if it found an event AND isn't 100% sure
+                if ai_found_apnea and mean_confidence < 0.99: 
+                    ask_for_help = True
 
             if ask_for_help:
                 current_seg_idx = env.current_step
@@ -116,16 +109,17 @@ def train_ppo_rlhf():
                 plt.show(block=False)
                 plt.pause(0.1) 
                 
-                # CHANGED: Binary Question UI
+                # CHANGED: Balanced Context-Aware Feedback
+                # Because it ONLY asks questions when ai_found_apnea is True, the math is simple!
                 user_input = input(f"Classify {TARGET_TYPE}: [1] True Event, [0] False Alarm, [s] Skip: ").strip()
                 plt.close()
                 
                 if user_input == '1':
-                    human_bonus = 10.0  
-                    print(f"--> Human confirmed {TARGET_TYPE}.")
+                    human_bonus = 5.0  # The AI guessed right! Reward it.
+                    print(f"--> Human confirmed {TARGET_TYPE}! Good job AI.")
                 elif user_input == '0':
-                    human_bonus = -0.5 
-                    print("--> Human says FALSE ALARM.")
+                    human_bonus = -5.0 # The AI guessed wrong (False Alarm)! Punish it.
+                    print("--> Human says FALSE ALARM. Penalty applied.")
                 else:
                     print("--> Skipped.")
                     
