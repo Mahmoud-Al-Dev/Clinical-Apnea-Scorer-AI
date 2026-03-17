@@ -50,9 +50,7 @@ class ApneaEnv(gym.Env):
         missed_apnea = np.sum((action == 0) & (target == 1))
         false_alarm = np.sum((action == 1) & (target == 0))
         
-        # Your optimized CA rewards!
         if 'CA' in str(self.Y.shape): 
-            # Extreme penalty for missing, almost no penalty for false alarms
             step_reward = float((correct_normal * 1.0) + (correct_apnea * 15.0) - (missed_apnea * 15.0) - (false_alarm * 15.0))
         else:
             step_reward = float((correct_normal * 1.0) + (correct_apnea * 20.0) - (missed_apnea * 15.0) - (false_alarm * 50.0))
