@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.signal import butter, filtfilt, hilbert, resample
-from scipy.ndimage import uniform_filter1d, binary_dilation
+from scipy.signal import butter, filtfilt, hilbert, resample, detrend
+from scipy.ndimage import uniform_filter1d, median_filter
 from sklearn.preprocessing import StandardScaler
 
 
@@ -21,12 +21,21 @@ data = df[(df['time_sec'] >= window_start) & (df['time_sec'] <= window_end)].cop
 # =============================================================
 print("2. Extracting and Engineering features at 256 Hz...")
 fs_original = 256
-
 # A. Detrending
-from scipy.signal import detrend
 data['PFlow_Detrend'] = detrend(data['PFlow'])
 data['Thorax_Detrend'] = detrend(data['Thorax'])
 data['Abdomen_Detrend'] = detrend(data['Abdomen'])
+data['Vitalog1_Med'] = median_filter(data['Vitalog1'], size=fs_original)
+data['Vitalog2_Med'] = median_filter(data['Vitalog2'], size=fs_original)
+
+# 2. Gentle Low-Pass Filter to remove the high-frequency fuzz (Cutoff at 2.0 Hz)
+def apply_lowpass(signal, cutoff, fs, order=2):
+    nyq = 0.5 * fs
+    b, a = butter(order, cutoff/nyq, btype='low')
+    return filtfilt(b, a, signal)
+
+data['Vitalog1_Clean'] = apply_lowpass(data['Vitalog1_Med'], 2.0, fs_original)
+data['Vitalog2_Clean'] = apply_lowpass(data['Vitalog2_Med'], 2.0, fs_original)
 
 # B. SaO2 Smoothing
 data['SaO2_Smooth'] = uniform_filter1d(data['SaO2'], size=512)
@@ -41,54 +50,50 @@ data['PFlow_Clean'] = apply_bandpass(data['PFlow_Detrend'], 0.15, 0.7, fs_origin
 data['Thorax_Clean'] = apply_bandpass(data['Thorax_Detrend'], 0.1, 0.3, fs_original)
 data['Abdomen_Clean'] = apply_bandpass(data['Abdomen_Detrend'], 0.1, 0.3, fs_original)
 
-
-# -------------------------------------------------------------
-# NEW: D. UPPER/LOWER ENVELOPE & AMPLITUDE WIDTH 
-# -------------------------------------------------------------
-# Since the band-pass filter centers the signal on 0, the envelopes are symmetric.
-# Upper is +Hilbert, Lower is -Hilbert. The distance is Upper - Lower.
-
-# PFlow Envelopes & Width
+# D. UPPER/LOWER ENVELOPE & AMPLITUDE WIDTH 
 data['PFlow_Upper'] = np.abs(hilbert(data['PFlow_Clean']))
 data['PFlow_Lower'] = -data['PFlow_Upper']
 data['PFlow_Width'] = data['PFlow_Upper'] - data['PFlow_Lower'] 
 
-# Thorax Envelopes & Width
 data['Thorax_Upper'] = np.abs(hilbert(data['Thorax_Clean']))
 data['Thorax_Lower'] = -data['Thorax_Upper']
 data['Thorax_Width'] = data['Thorax_Upper'] - data['Thorax_Lower']
 
-# Abdomen Envelopes & Width
 data['Abdomen_Upper'] = np.abs(hilbert(data['Abdomen_Clean']))
 data['Abdomen_Lower'] = -data['Abdomen_Upper']
 data['Abdomen_Width'] = data['Abdomen_Upper'] - data['Abdomen_Lower']
-# -------------------------------------------------------------
-# NEW: E. FEATURE ENGINEERING
-# -------------------------------------------------------------
-# Feature 1: Thorax-Abdomen Cross-Correlation (Paradoxical Breathing)
-# We use a 5-second rolling window (5s * 256Hz = 1280 samples) to check if they move together.
+
+# E. FEATURE ENGINEERING
 window_size = 5 * fs_original 
-# Use the new "Width" features for calculations instead of just the Upper envelope
 data['Thorax_Abdomen_Corr'] = data['Thorax_Width'].rolling(window=window_size, center=True).corr(data['Abdomen_Width'])
 data['Thorax_Abdomen_Corr'] = data['Thorax_Abdomen_Corr'].bfill().ffill()
-
 data['Effort_Flow_Ratio'] = (data['Thorax_Width'] + data['Abdomen_Width']) / (data['PFlow_Width'] + 0.001)
 
-# --- THE BIG 18-CHANNEL FEATURE LIST ---
+# --- F. ADVANCED PHYSIOLOGICAL FEATURES ---
+print("   Calculating advanced physiological features...")
+
+# 1. SaO2 Derivative (Rate of Desaturation)
+data['SaO2_Deriv'] = np.gradient(data['SaO2_Smooth'])
+
+# 2. Thorax-Abdomen Phase Angle (The OSA Gold Standard)
+phase_thorax = np.unwrap(np.angle(hilbert(data['Thorax_Clean'])))
+phase_abdomen = np.unwrap(np.angle(hilbert(data['Abdomen_Clean'])))
+data['Phase_Angle'] = np.abs(phase_thorax - phase_abdomen)
+
+# 3. Airflow Rolling Variance (The "Silence" Detector)
+data['PFlow_Var'] = data['PFlow_Clean'].rolling(window=3*fs_original, center=True).var()
+data['PFlow_Var'] = data['PFlow_Var'].bfill().ffill()
+
+# Compile features
 feature_columns = [
-    # RAW SIGNALS (Exactly as they came from the CSV)
-    'PFlow', 'Thorax', 'Abdomen',                         # Indices 0, 1, 2
-    
-    # CLEAN SIGNALS (Detrended + Butterworth Filtered)
-    'PFlow_Clean', 'Thorax_Clean', 'Abdomen_Clean',       # Indices 3, 4, 5
-    
-    # ENVELOPES & WIDTHS
-    'PFlow_Upper', 'PFlow_Lower', 'PFlow_Width',          # Indices 6, 7, 8
-    'Thorax_Upper', 'Thorax_Lower', 'Thorax_Width',       # Indices 9, 10, 11
-    'Abdomen_Upper', 'Abdomen_Lower', 'Abdomen_Width',    # Indices 12, 13, 14
-    
-    # ENGINEERED FEATURES & SaO2
-    'SaO2_Smooth', 'Thorax_Abdomen_Corr', 'Effort_Flow_Ratio' # Indices 15, 16, 17
+    'PFlow', 'Thorax', 'Abdomen',                       # 0, 1, 2
+    'PFlow_Clean', 'Thorax_Clean', 'Abdomen_Clean',     # 3, 4, 5
+    'PFlow_Upper', 'PFlow_Lower', 'PFlow_Width',        # 6, 7, 8
+    'Thorax_Upper', 'Thorax_Lower', 'Thorax_Width',     # 9, 10, 11
+    'Abdomen_Upper', 'Abdomen_Lower', 'Abdomen_Width',  # 12, 13, 14
+    'SaO2_Smooth', 'Thorax_Abdomen_Corr', 'Effort_Flow_Ratio', # 15, 16, 17
+    'SaO2_Deriv', 'Phase_Angle', 'PFlow_Var',            # 18, 19, 20
+    'Vitalog1_Clean','Vitalog2_Clean'                   # 21, 22 
 ]
 
 features_256hz = data[feature_columns].values
@@ -204,37 +209,6 @@ axes[5].legend(loc="upper right")
 
 plt.show()
 
-print("7. Generating Pseudo-Labels (Virtual Doctor)...")
-
-# We use the RAW segments (not normalized) so we can see the true zero-drops
-# Channel 8 is 'PFlow_Width' (The total volume of the airflow)
-pflow_width_segments = segments[:, :, 8] 
-Y_labels = np.zeros_like(pflow_width_segments)
-
-for i in range(pflow_width_segments.shape[0]):
-    segment = pflow_width_segments[i]
-    
-    # 1. Define baseline (80th percentile)
-    baseline_volume = np.percentile(segment, 80)
-    
-    # 2. Trigger earlier on the slope (Drop below 30% instead of 25%)
-    apnea_threshold = baseline_volume * 0.30
-    raw_mask = (segment < apnea_threshold).astype(int)
-    
-    # 3. Relax the 10-second strictness
-    smoothed_mask = uniform_filter1d(raw_mask, size=320)
-    # WIDEN TRICK #1: Lower threshold from 0.80 to 0.40
-    final_mask = (smoothed_mask > 0.40).astype(int)
-    
-    # 4. WIDEN TRICK #2: Morphological Dilation
-    # We expand the edges of the box by 1.5 seconds on both sides
-    # 1.5 seconds * 32 Hz = 48 samples
-    final_mask = binary_dilation(final_mask, iterations=48).astype(int)
-    
-    Y_labels[i] = final_mask
-
-print(f"   Created Y_labels of shape {Y_labels.shape}")
-
 # =============================================================
 # 7. EXTRACT CORE CHANNELS & SAVE X_TRAIN
 # =============================================================
@@ -243,15 +217,15 @@ print(f"   Created Y_labels of shape {Y_labels.shape}")
 # =============================================================
 print("7. Extracting 6 core channels for AI input...")
 
-# Indices for: [PFlow_Width, Thorax_Width, Abdomen_Width, SaO2, Corr, Ratio]
-core_indices = [8, 11, 14, 15, 16, 17]
+# Indices for: [PFlow_Clean(3), Abdomen_Clean(5), Ratio(17), SaO2_Deriv(18), PFlow_Var(20), Vitalog2(22)]
+core_indices = [3, 5, 17, 18, 20, 22]
 
 # We extract ONLY these from the NORMALIZED segments
 X_train = normalized_segments[:, :, core_indices]
 
 # Save BOTH the features and the time alignments to disk!
 np.save('X_train_PentaLSTM.npy', X_train)
-np.save('segment_times.npy', segment_times) # <--- ADDED THIS LINE
+np.save('segment_times.npy', segment_times) 
 
 print(f"\n✅ SUCCESS! Preprocessing complete.")
 print(f"   X_train saved: {X_train.shape} (Segments, Time-Steps, Channels)")

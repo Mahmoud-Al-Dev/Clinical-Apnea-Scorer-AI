@@ -7,7 +7,8 @@ from torch.utils.data import Dataset, DataLoader
 # --- USER CONTROLS ---
 # =================================================================
 # Change this to 'OSA' or 'CA' to train the specific model!
-TARGET_TYPE = 'CA' 
+TARGET_TYPE = 'OSA' 
+NIGHT_TO_TEST = 1
 # =================================================================
 
 class ApneaDataset(Dataset):
@@ -47,17 +48,17 @@ def train_model():
     print(f"Training Binary SFT for {TARGET_TYPE} on {device}...")
     
     # Dynamically load the correct label file based on TARGET_TYPE
-    y_filename = f'Y_train_Labels_{TARGET_TYPE}.npy'
-    dataset = ApneaDataset('X_train_PentaLSTM.npy', y_filename)
+    y_filename = f'Y_{TARGET_TYPE}_{NIGHT_TO_TEST}.npy'
+    dataset = ApneaDataset(f'X_{NIGHT_TO_TEST}.npy', y_filename)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     
     model = PentaLSTM().to(device)
     
     # CHANGED: Only 2 weights now. Class 0 gets weight 1, Class 1 gets weight 35.
-    class_weights = torch.tensor([1.0, 80], dtype=torch.float32).to(device)
+    class_weights = torch.tensor([1.0, 15], dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
     epochs = 30
     
     for epoch in range(epochs):
@@ -65,11 +66,32 @@ def train_model():
         epoch_loss = 0
         for batch_x, batch_y in dataloader:
             optimizer.zero_grad()
+            
+            # 1. Get predictions
             predictions = model(batch_x.to(device))
-            loss = criterion(predictions, batch_y.to(device))
+            
+            # 2. Standard Classification Loss
+            ce_loss = criterion(predictions, batch_y.to(device))
+            
+            # =========================================================
+            # NEW: 3. Temporal Continuity Penalty (Anti-Flicker)
+            # =========================================================
+            # Extract the raw probability of predicting "1" (Apnea)
+            probs = torch.softmax(predictions, dim=1)[:, 1, :]
+            
+            # Calculate how much the prediction jumps between adjacent timesteps
+            # (If it jumps from 0 to 1 constantly, this penalty becomes massive)
+            flicker_penalty = torch.mean(torch.abs(probs[:, 1:] - probs[:, :-1]))
+            
+            # Combine the losses! (The '0.5' is the multiplier. 
+            # If it STILL blips, raise to 1.0. If it becomes too lazy, lower to 0.1)
+            loss = ce_loss + (.5 * flicker_penalty)
+            # =========================================================
+
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
+            
         print(f"Epoch {epoch+1}/{epochs} | Loss: {epoch_loss/len(dataloader):.4f}")
 
     # Dynamically save the weights so they don't overwrite each other!

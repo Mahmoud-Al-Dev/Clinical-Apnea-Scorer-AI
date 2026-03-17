@@ -1,15 +1,15 @@
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
-
+NIGHT_TO_TEST=2
 class ApneaEnv(gym.Env):
-    def __init__(self, target_type='CA', x_path='X_train_PentaLSTM.npy'):
+    def __init__(self, target_type='CA', x_path=f'X_{NIGHT_TO_TEST}.npy'):
         super(ApneaEnv, self).__init__()
         
         print(f"Initializing Balanced Apnea Simulator for {target_type}...")
         self.X = np.load(x_path)
         
-        y_path = f'Y_train_Labels_{target_type}.npy'
+        y_path = f'Y_{target_type}_{NIGHT_TO_TEST}.npy'
         self.Y = np.load(y_path)
         
         self.num_segments = len(self.X)
@@ -53,7 +53,7 @@ class ApneaEnv(gym.Env):
         # Your optimized CA rewards!
         if 'CA' in str(self.Y.shape): 
             # Extreme penalty for missing, almost no penalty for false alarms
-            step_reward = float((correct_normal * 1.0) + (correct_apnea * 75.0) - (missed_apnea * 75.0) - (false_alarm * 2.0))
+            step_reward = float((correct_normal * 1.0) + (correct_apnea * 15.0) - (missed_apnea * 15.0) - (false_alarm * 15.0))
         else:
             step_reward = float((correct_normal * 1.0) + (correct_apnea * 20.0) - (missed_apnea * 15.0) - (false_alarm * 50.0))
             

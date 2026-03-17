@@ -10,7 +10,7 @@ from actor_critic_lstm import ActorCriticLSTM
 # ==========================================
 TARGET_TIME_SEC = 10923
 NIGHT_TO_TEST = 2       # Change to 1 or 2 to switch patients!
-INPUT_CHANNELS = 6     # Ensure this matches your model architecture (6 or 7)
+INPUT_CHANNELS = 6     
 # ==========================================
 
 print(f"1. Loading Data for Night {NIGHT_TO_TEST}...")

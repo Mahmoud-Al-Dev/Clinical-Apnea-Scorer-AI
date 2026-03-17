@@ -12,7 +12,8 @@ from actor_critic_lstm import ActorCriticLSTM, load_pretrained_supervised_weight
 # --- USER CONTROLS ---
 # ==========================================
 TARGET_TYPE = 'CA'  # Change to 'OSA' to train the Obstructive model!
-MAX_QUESTIONS_PER_EPOCH = 5 
+NIGHT_TO_TEST=2
+MAX_QUESTIONS_PER_EPOCH = 8
 WARM_UP_EPOCHS = 2 
 INPUT_CHANNELS = 6  
 # ==========================================
@@ -21,7 +22,7 @@ def train_ppo_rlhf():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Starting Binary RLHF PPO for {TARGET_TYPE} on Device: {device}")
     
-    segment_times = np.load('segment_times.npy') 
+    segment_times = np.load(f'segment_times_n{NIGHT_TO_TEST}.npy') 
     
     # Pass the TARGET_TYPE to the environment
     env = ApneaEnv(target_type=TARGET_TYPE)
@@ -32,7 +33,7 @@ def train_ppo_rlhf():
     sft_weights_path = f'penta_lstm_{TARGET_TYPE}_weights.pth'
     agent = load_pretrained_supervised_weights(agent, weights_path=sft_weights_path, device=device)
     
-    optimizer = optim.Adam(agent.parameters(), lr=0.0003)
+    optimizer = optim.Adam(agent.parameters(), lr=0.0001)
     epochs = 5
     
     for epoch in range(epochs):
@@ -41,7 +42,10 @@ def train_ppo_rlhf():
         
         print(f"\n--- Starting Epoch {epoch + 1}/{epochs} ---")
         
-        for step in range(500):
+        # CHANGED: Dynamically set the steps per epoch to match your dataset size!
+        steps_per_epoch = 100
+        
+        for step in range(steps_per_epoch):
             obs, info = env.reset()
             obs = torch.tensor(obs, dtype=torch.float32).unsqueeze(0).to(device)
             
@@ -72,7 +76,7 @@ def train_ppo_rlhf():
                 ai_found_apnea = np.sum(plot_action_numpy == 1) > 30
                 
                 # 2. THE OLD SYSTEM: Only ask if it found an event AND isn't 100% sure
-                if ai_found_apnea and mean_confidence < 0.99: 
+                if ai_found_apnea and mean_confidence < 0.91: 
                     ask_for_help = True
 
             if ask_for_help:
@@ -85,7 +89,7 @@ def train_ppo_rlhf():
                 print(f"AI Confidence ({mean_confidence:.2f}): Checking {real_start_time:.1f}s to {real_end_time:.1f}s.")
                 
                 # Dynamic feature names based on channel count
-                feature_names = ['PFlow', 'Abdomen','Ratio', 'SaO2_Deriv', 'PFlow_Var', 'Vitalog2']
+                feature_names = ['PFlow_Clean', 'Abdomen_Clean', 'Ratio', 'SaO2_Deriv', 'PFlow_Var', 'Vitalog2']
                 if INPUT_CHANNELS == 7: feature_names.append('Heart_Rate')
                 
                 fig, axes = plt.subplots(INPUT_CHANNELS, 1, figsize=(12, 2 * INPUT_CHANNELS), sharex=True)
@@ -115,7 +119,7 @@ def train_ppo_rlhf():
                 plt.close()
                 
                 if user_input == '1':
-                    human_bonus = 5.0  # The AI guessed right! Reward it.
+                    human_bonus = 10.0  # The AI guessed right! Reward it.
                     print(f"--> Human confirmed {TARGET_TYPE}! Good job AI.")
                 elif user_input == '0':
                     human_bonus = -5.0 # The AI guessed wrong (False Alarm)! Punish it.

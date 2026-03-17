@@ -7,7 +7,7 @@ from train_lstm import PentaLSTM
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TIME_SEC =  10220
+TARGET_TIME_SEC =  10878
 NIGHT_TO_TEST = 2  # Change this to 1 or 2 to switch patients!
 # ==========================================
 
@@ -18,6 +18,7 @@ segment_times = np.load(f'segment_times_n{NIGHT_TO_TEST}.npy')
 
 Y_true_CA = np.load(f'Y_CA_{NIGHT_TO_TEST}.npy')
 Y_true_OSA = np.load(f'Y_OSA_{NIGHT_TO_TEST}.npy')
+
 
 # 2. Dynamically find the correct Segment Index
 start_times = segment_times[:, 0]
