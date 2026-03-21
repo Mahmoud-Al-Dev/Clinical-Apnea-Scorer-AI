@@ -13,7 +13,7 @@ INPUT_CHANNELS = 6      # Ensure this matches your model architecture (6 or 7)
 
 # NEW: Define your exact time window here. 
 # Set both to None to plot the entire night!
-WINDOW_START_SEC = 6500  
+WINDOW_START_SEC = 6000
 WINDOW_END_SEC = 7000
 # ==========================================
 
@@ -97,12 +97,12 @@ full_classes_osa = (full_probs_osa > 0.5).astype(int)
 print("5. Applying the 10-second Clinical Cleanup Filter...")
 labeled_ca, num_ca = label(full_classes_ca == 1)
 for i in range(1, num_ca + 1):
-    if (labeled_ca == i).sum() < 320: 
+    if (labeled_ca == i).sum() < 250: 
         full_classes_ca[labeled_ca == i] = 0
 
 labeled_osa, num_osa = label(full_classes_osa == 1)
 for i in range(1, num_osa + 1):
-    if (labeled_osa == i).sum() < 320:
+    if (labeled_osa == i).sum() < 250:
         full_classes_osa[labeled_osa == i] = 0
 
 # =========================================================
@@ -125,7 +125,32 @@ plot_classes_ca = full_classes_ca[mask]
 plot_classes_osa = full_classes_osa[mask]
 
 # =========================================================
+# NEW: Extract and Print Exact AI Event Timestamps
+# =========================================================
+print("\n" + "="*50)
+print(f"--- AI Predicted Events in Window {WINDOW_START_SEC}s - {WINDOW_END_SEC}s ---")
 
+def print_event_times(classes_array, time_array, label_name):
+    # Find the contiguous blocks of 1s
+    labeled_events, num_events = label(classes_array == 1)
+    print(f"\n{label_name} Predictions ({num_events}):")
+    
+    if num_events == 0:
+        print("  None detected in this window.")
+        
+    for i in range(1, num_events + 1):
+        # Extract the timestamps for this specific event
+        event_times = time_array[labeled_events == i]
+        start_t = event_times[0]
+        end_t = event_times[-1]
+        duration = end_t - start_t
+        print(f"  - Event {i}: Start: {start_t:.2f}s | End: {end_t:.2f}s | Duration: {duration:.2f}s")
+
+# Run the printer for both CA and OSA
+print_event_times(plot_classes_ca, plot_time, "CA (Red)")
+print_event_times(plot_classes_osa, plot_time, "OSA (Orange)")
+print("="*50 + "\n")
+# =========================================================
 print("7. Plotting the multi-channel timeline...")
 channel_names = ['PFlow_Clean', 'Abdomen_Clean', 'Ratio', 'SaO2_Deriv', 'PFlow_Var', 'Vitalog2']
 

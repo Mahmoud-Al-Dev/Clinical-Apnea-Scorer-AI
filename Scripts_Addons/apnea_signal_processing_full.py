@@ -154,7 +154,6 @@ print(f"   Created {segments.shape[0]} segments.")
 print("5. Applying segment-wise Z-score normalization...")
 normalized_segments = np.zeros_like(segments)
 
-# Index 20 is PFlow_Var. We want to skip ALL safety catches for it.
 VAR_IDX = 20 
 
 for i in range(segments.shape[0]):
@@ -165,7 +164,6 @@ for i in range(segments.shape[0]):
     stds = np.std(seg, axis=0)
     
     for col in range(seg.shape[1]):
-        # BYPASS: If this is the variance channel, DO NOT zero it out!
         if col == VAR_IDX:
             # If it's literally all zeros (dead signal), just keep it zeros
             if stds[col] == 0:

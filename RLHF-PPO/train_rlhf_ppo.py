@@ -4,6 +4,11 @@ import torch.optim as optim
 from torch.distributions import Categorical 
 import numpy as np
 import matplotlib.pyplot as plt
+import mlflow
+import mlflow.pytorch
+
+mlflow.set_tracking_uri("file:./mlruns")
+mlflow.set_experiment("Sleep_Apnea_RLHF_Night_2")
 
 from apnea_env import ApneaEnv
 from actor_critic_lstm import ActorCriticLSTM, load_pretrained_supervised_weights
@@ -42,7 +47,6 @@ def train_ppo_rlhf():
         
         print(f"\n--- Starting Epoch {epoch + 1}/{epochs} ---")
         
-        # CHANGED: Dynamically set the steps per epoch to match your dataset size!
         steps_per_epoch = 100
         
         for step in range(steps_per_epoch):
@@ -75,7 +79,6 @@ def train_ppo_rlhf():
                 # 1. Did the AI actually draw red lines?
                 ai_found_apnea = np.sum(plot_action_numpy == 1) > 30
                 
-                # 2. THE OLD SYSTEM: Only ask if it found an event AND isn't 100% sure
                 if ai_found_apnea and mean_confidence < 0.91: 
                     ask_for_help = True
 
@@ -88,7 +91,6 @@ def train_ppo_rlhf():
                 print(f"\n⚠️ [ACTIVE LEARNING {questions_asked_this_epoch+1}/{current_max_questions}]")
                 print(f"AI Confidence ({mean_confidence:.2f}): Checking {real_start_time:.1f}s to {real_end_time:.1f}s.")
                 
-                # Dynamic feature names based on channel count
                 feature_names = ['PFlow_Clean', 'Abdomen_Clean', 'Ratio', 'SaO2_Deriv', 'PFlow_Var', 'Vitalog2']
                 if INPUT_CHANNELS == 7: feature_names.append('Heart_Rate')
                 

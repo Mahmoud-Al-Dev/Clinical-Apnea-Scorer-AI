@@ -4,8 +4,8 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data\ON020217-06.TXT'  
-SEGMENT_TIMES_PATH = 'segment_times.npy'
+TXT_FILE_PATH = 'D:\Masterarbeit\Clinical-Apnea-Scorer-AI\Data\ON030217-06_RLHF_Updated.TXT'  
+SEGMENT_TIMES_PATH = 'segment_times_n1.npy'
 # ==========================================
 
 print("1. Loading saved segment timeline...")

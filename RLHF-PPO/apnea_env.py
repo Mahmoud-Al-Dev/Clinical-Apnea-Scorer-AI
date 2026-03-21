@@ -29,8 +29,7 @@ class ApneaEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         
-        # CHANGED: 50/50 Balanced Sampling Strategy
-        # 50% chance to force the AI to look at a segment that we KNOW has an apnea
+        # CHANGED: 20/80 Balanced Sampling Strategy
         if np.random.rand() < 0.2 and len(self.apnea_indices) > 0:
             self.current_step = np.random.choice(self.apnea_indices)
         else:
