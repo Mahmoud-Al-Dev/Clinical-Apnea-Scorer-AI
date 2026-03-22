@@ -62,7 +62,7 @@ def train_ppo_rlhf():
     # =======================================================
     with mlflow.start_run(run_name=f"RLHF_{TARGET_TYPE}_Night_{NIGHT_TO_TEST}"):
         
-        # 1. Log all our parameters up front
+        # 1. Log all the parameters up front
         mlflow.log_params({
             "target_type": TARGET_TYPE,
             "night_to_test": NIGHT_TO_TEST,
@@ -124,7 +124,7 @@ def train_ppo_rlhf():
                     real_end_time = segment_times[current_seg_idx, -1]
                     time_axis = segment_times[current_seg_idx]
 
-                    print(f"\n⚠️ [ACTIVE LEARNING {questions_asked_this_epoch+1}/{MAX_QUESTIONS_PER_EPOCH}]")
+                    print(f"\n[!] [ACTIVE LEARNING {questions_asked_this_epoch+1}/{MAX_QUESTIONS_PER_EPOCH}]")
                     print(f"AI Confidence ({mean_confidence:.2f}): Checking {real_start_time:.1f}s to {real_end_time:.1f}s.")
 
                     feature_names = ['PFlow_Clean', 'Abdomen_Clean', 'Ratio', 'SaO2_Deriv', 'PFlow_Var', 'Vitalog2']
@@ -209,9 +209,9 @@ def train_ppo_rlhf():
         # =======================================================
         save_path = f'rlhf_penta_lstm_{TARGET_TYPE}_weights.pth'
         torch.save(agent.state_dict(), save_path)
-        print(f"\n✅ Binary RLHF Training Complete! Saved as '{save_path}'")
+        print(f"\n[SUCCESS] Binary RLHF Training Complete! Saved as '{save_path}'")
         
-        print("\n📊 Running Automatic Clinical Evaluation on Full Night...")
+        print("\n[EVAL] Running Automatic Clinical Evaluation on Full Night...")
         clinical_results = evaluate_full_night(agent, NIGHT_TO_TEST, TARGET_TYPE, device)
         
         print("Logging Clinical Metrics to MLflow...")
@@ -220,7 +220,7 @@ def train_ppo_rlhf():
             
         # Save the model artifact to MLflow
         mlflow.pytorch.log_model(agent, "model_weights")
-        print("✅ Run complete. All data sent to MLflow Dashboard!")
+        print("[SUCCESS] Run complete. All data sent to MLflow Dashboard!")
 
 if __name__ == "__main__":
     train_ppo_rlhf()

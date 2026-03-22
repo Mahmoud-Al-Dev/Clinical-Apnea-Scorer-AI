@@ -47,5 +47,5 @@ def load_pretrained_supervised_weights(rl_model, weights_path, device='cpu'):
             rl_dict['actor_head.bias'] = v
 
     rl_model.load_state_dict(rl_dict)
-    print("✅ Successfully transplanted BOTH the LSTM memory and Binary Actor Policy!")
+    print("[SUCCESS] Successfully transplanted BOTH the LSTM memory and Binary Actor Policy!")
     return rl_model
