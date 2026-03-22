@@ -1,0 +1,14 @@
+artifact_uri: file:D:/Masterarbeit/Clinical-Apnea-Scorer-AI/mlruns/683303686745125417/52555c53b457488db3ea6d343a04bda9/artifacts
+end_time: 1774206050887
+entry_point_name: ''
+experiment_id: '683303686745125417'
+lifecycle_stage: active
+run_id: 52555c53b457488db3ea6d343a04bda9
+run_name: RLHF_CA_Night_2
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1774205851762
+status: 3
+tags: []
+user_id: m_m_r

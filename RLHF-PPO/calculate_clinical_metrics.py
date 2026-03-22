@@ -11,7 +11,7 @@ def apply_cleanup_filter(predictions, min_length_frames=320):
             cleaned[labeled_array == i] = 0
     return cleaned
 
-def evaluate_clinical_events(predictions, ground_truth, min_length=320, overlap_threshold=0.30):
+def evaluate_clinical_events(predictions, ground_truth, min_length=250, overlap_threshold=0.30):
     preds_clean = apply_cleanup_filter(predictions, min_length)
     
     true_events, num_true = label(ground_truth == 1)

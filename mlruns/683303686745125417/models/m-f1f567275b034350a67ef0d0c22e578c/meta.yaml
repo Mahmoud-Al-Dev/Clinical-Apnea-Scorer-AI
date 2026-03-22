@@ -1,0 +1,10 @@
+artifact_location: file:D:/Masterarbeit/Clinical-Apnea-Scorer-AI/mlruns/683303686745125417/models/m-f1f567275b034350a67ef0d0c22e578c/artifacts
+creation_timestamp: 1774206312524
+experiment_id: '683303686745125417'
+last_updated_timestamp: 1774206315854
+model_id: m-f1f567275b034350a67ef0d0c22e578c
+model_type: null
+name: model_weights
+source_run_id: ebb67aa9c6304eea95bc96a9e9205100
+status: 2
+status_message: null
