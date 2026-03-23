@@ -52,3 +52,31 @@ To ensure rigorous academic reproducibility, the training loop is deeply integra
 * **SciPy & Scikit-Learn:** Butterworth filters, Hilbert transforms, Morphological operations, Standardization.
 * **Gymnasium (OpenAI Gym):** Custom RL environment (`apnea_env.py`) simulation for sequential medical data.
 * **Pandas & NumPy:** Big-data manipulation, array stitching, and feature synthesis.
+
+## 📂 Repository Structure
+
+```text
+CLINICAL-APNEA-SCORER-AI/
+├── Data/                           # Raw/Processed signal data 
+├── RLHF-PPO/                       # Reinforcement Learning from Human Feedback
+│   ├── actor_critic_lstm.py
+│   ├── apnea_env.py
+│   ├── calculate_clinical_metrics.py
+│   ├── train_rlhf_ppo.py
+│   ├── visualize_full_rlhf.py
+│   └── visualize_rlhf.py
+├── Scripts_Addons/                 # Utility scripts for data processing & labeling
+│   ├── apnea-signal-processing.py
+│   ├── apnea_signal_processing_full.py
+│   ├── blender.py
+│   ├── generate_clinical_y_labels.py
+│   ├── insert_clinical_events.py
+│   └── ultimate_test.py
+├── Supervised_Learning/            # Initial supervised model training (LSTM)
+│   ├── train_lstm.py
+│   ├── visualize_full_dataset.py
+│   └── visualize_results.py
+├── docs/                           # Documentation
+├── mlruns/                         # MLflow tracking directory for experiments
+├── .gitignore                      # Git tracking exclusions
+└── README.md                       # Main project documentation
