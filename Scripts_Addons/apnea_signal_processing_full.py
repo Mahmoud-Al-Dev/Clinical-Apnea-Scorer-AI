@@ -178,10 +178,17 @@ for i in range(segments.shape[0]):
 # =============================================================
 # 6. EXTRACT CORE CHANNELS & SAVE X_TRAIN
 # =============================================================
-print("6. Extracting 6 core channels for AI input...")
+print("6. Extracting 5 core channels for AI input...")
 
-# Indices for: [PFlow_Clean(3), Abdomen_Clean(5), Ratio(17), SaO2_Deriv(18), PFlow_Var(20), Vitalog2(22)]
-core_indices = [3, 5, 17, 18, 20, 22]
+# The Ultimate 6:
+# [3] PFlow_Clean
+# [11] Thorax_Width
+# [14] Abdomen_Width
+# [15] SaO2_Smooth
+# [17] Effort_Flow_Ratio  <-- The OSA Savior
+# [18] SaO2_Deriv
+
+core_indices = [3, 4, 5, 11, 14, 15, 17, 18] 
 
 X_train = normalized_segments[:, :, core_indices]
 np.save('X_train_PentaLSTM.npy', X_train)

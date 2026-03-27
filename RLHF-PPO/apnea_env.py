@@ -2,11 +2,13 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-NIGHT_TO_TEST = 2
+NIGHT_TO_TEST = 1
+TARGET_TYPE= 'OSA' 
+
 
 class ApneaEnv(gym.Env):
-    def __init__(self, target_type='CA', x_path=f'X_{NIGHT_TO_TEST}.npy', 
-                 reward_normal=1.0, reward_apnea=15.0, penalty_miss=15.0, penalty_fa=15.0): # <-- ADDED VARIABLES
+    def __init__(self, target_type=TARGET_TYPE, x_path=f'X_{NIGHT_TO_TEST}.npy', 
+                 reward_normal=1.0, reward_apnea=15.0, penalty_miss=15.0, penalty_fa=15.0): 
         super(ApneaEnv, self).__init__()
         
         print(f"Initializing Balanced Apnea Simulator for {target_type}...")
@@ -28,8 +30,14 @@ class ApneaEnv(gym.Env):
         print(f"--> Found {len(self.apnea_indices)} segments containing {target_type} events out of {self.num_segments} total.")
         
         num_channels = self.X.shape[-1]
+
+        # Mapping the 8-channel array:
+        self.ai_indices = [0, 3, 4, 5, 6, 7]  # PFlow, Thor_W, Abd_W, SaO2_S, Ratio, SaO2_D
+        self.human_indices = [0, 1, 2, 5]     # PFlow, Thor_C, Abd_C, SaO2_S
+        
+        # CHANGED: AI observation space is now 6 channels
         self.observation_space = spaces.Box(
-            low=-10.0, high=10.0, shape=(960, num_channels), dtype=np.float32
+            low=-10.0, high=10.0, shape=(960, 6), dtype=np.float32
         )
         self.action_space = spaces.MultiDiscrete([2] * 960)
         
@@ -41,8 +49,13 @@ class ApneaEnv(gym.Env):
         else:
             self.current_step = np.random.randint(0, self.num_segments)
         
-        obs = self.X[self.current_step].astype(np.float32)
-        info = {"target": self.Y[self.current_step].flatten()}
+        raw_segment = self.X[self.current_step]
+        obs = raw_segment[:, self.ai_indices].astype(np.float32) # AI gets 6
+        
+        info = {
+            "target": self.Y[self.current_step].flatten(),
+            "vis_data": raw_segment[:, self.human_indices] # Human gets 4
+        }
         
         self.episode_step_count = 0 
         return obs, info
@@ -67,7 +80,12 @@ class ApneaEnv(gym.Env):
         truncated = False
         
         num_channels = self.X.shape[-1]
-        next_obs = np.zeros((960, num_channels), dtype=np.float32)
-        info = {"target": target}
+        raw_segment = self.X[self.current_step]
+        next_obs = raw_segment[:, self.ai_indices].astype(np.float32) # AI gets 5
+        
+        info = {
+            "target": target,
+            "vis_data": raw_segment[:, self.human_indices] # Human gets 4
+        }
             
         return next_obs, step_reward, terminated, truncated, info

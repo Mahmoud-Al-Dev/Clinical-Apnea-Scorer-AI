@@ -14,11 +14,16 @@ NIGHT_TO_TEST = 1
 class ApneaDataset(Dataset):
     def __init__(self, x_file, y_file):
         self.x = torch.tensor(np.load(x_file), dtype=torch.float32)
-        # Flatten the labels to (Batch, 960) and make them Long integers!
         self.y = torch.tensor(np.load(y_file), dtype=torch.long).squeeze(-1)
         
+        # Mapping the 7-channel array to the 5 AI channels
+        self.ai_indices = [0, 3, 4, 5, 6, 7]
+        
     def __len__(self): return len(self.x)
-    def __getitem__(self, idx): return self.x[idx], self.y[idx]
+    
+    def __getitem__(self, idx): 
+        # ONLY return the 5 AI channels!
+        return self.x[idx, :, self.ai_indices], self.y[idx]
 
 class PentaLSTM(nn.Module):
     def __init__(self, input_size=6, hidden_size=128, num_layers=2):
@@ -47,19 +52,19 @@ def train_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training Binary SFT for {TARGET_TYPE} on {device}...")
     
-    # Dynamically load the correct label file based on TARGET_TYPE
     y_filename = f'Y_{TARGET_TYPE}_{NIGHT_TO_TEST}.npy'
     dataset = ApneaDataset(f'X_{NIGHT_TO_TEST}.npy', y_filename)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     
     model = PentaLSTM().to(device)
     
-    # CHANGED: Only 2 weights now. Class 0 gets weight 1, Class 1 gets weight 35.
-    class_weights = torch.tensor([1.0, 15], dtype=torch.float32).to(device)
+    # 1. Lowered the panic weight. 5.0 is plenty to make it care about OSA.
+    class_weights = torch.tensor([1.0, 5.0], dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
-    epochs = 30
+    # 2. Bumped LR slightly to help it find the path
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    epochs = 50
     
     for epoch in range(epochs):
         model.train() 
@@ -67,36 +72,23 @@ def train_model():
         for batch_x, batch_y in dataloader:
             optimizer.zero_grad()
             
-            # 1. Get predictions
             predictions = model(batch_x.to(device))
             
-            # 2. Standard Classification Loss
-            ce_loss = criterion(predictions, batch_y.to(device))
-            
-            # =========================================================
-            # NEW: 3. Temporal Continuity Penalty (Anti-Flicker)
-            # =========================================================
-            # Extract the raw probability of predicting "1" (Apnea)
-            probs = torch.softmax(predictions, dim=1)[:, 1, :]
-            
-            # Calculate how much the prediction jumps between adjacent timesteps
-            # (If it jumps from 0 to 1 constantly, this penalty becomes massive)
-            flicker_penalty = torch.mean(torch.abs(probs[:, 1:] - probs[:, :-1]))
-            
-            # Combine the losses! (The '0.5' is the multiplier. 
-            # If it STILL blips, raise to 1.0. If it becomes too lazy, lower to 0.1)
-            loss = ce_loss + (.5 * flicker_penalty)
-            # =========================================================
+            # 3. Pure, unadulterated Cross Entropy. No flicker penalty.
+            loss = criterion(predictions, batch_y.to(device))
 
             loss.backward()
+            
+            # 4. THE MAGIC FIX: Gradient Clipping! 
+            # This stops the LSTM from overshooting and bouncing on noisy OSA data.
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
             optimizer.step()
             epoch_loss += loss.item()
             
         print(f"Epoch {epoch+1}/{epochs} | Loss: {epoch_loss/len(dataloader):.4f}")
 
-    # Dynamically save the weights so they don't overwrite each other!
     save_name = f'penta_lstm_{TARGET_TYPE}_weights.pth'
     torch.save(model.state_dict(), save_name)
     print(f"✅ Saved weights to {save_name}")
-
 if __name__ == "__main__": train_model()

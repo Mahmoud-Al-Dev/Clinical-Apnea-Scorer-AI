@@ -4,7 +4,7 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data\ON030217-06.TXT'  
+TXT_FILE_PATH = 'Data\ON020217-06.TXT'  
 SEGMENT_TIMES_PATH = 'segment_times.npy'
 # ==========================================
 

@@ -17,11 +17,11 @@ from calculate_clinical_metrics import evaluate_full_night # <-- IMPORTED EVALUA
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TYPE = 'CA'
-NIGHT_TO_TEST = 2
+TARGET_TYPE = 'OSA'
+NIGHT_TO_TEST = 1
 MAX_QUESTIONS_PER_EPOCH = 8
 WARM_UP_EPOCHS = 2 
-INPUT_CHANNELS = 6  
+INPUT_CHANNELS = 6
 # ==========================================
 
 def train_ppo_rlhf():
@@ -33,16 +33,23 @@ def train_ppo_rlhf():
     EPOCHS = 5
     STEPS_PER_EPOCH = 100
     CONFIDENCE_THRESHOLD = 0.91
-    HUMAN_REWARD_BONUS = 10.0
-    HUMAN_PENALTY_MINUS = -5.0
+    HUMAN_REWARD_BONUS = 20.0 if TARGET_TYPE == 'CA' else 30.0
+    HUMAN_PENALTY_MINUS = -20.0 if TARGET_TYPE == 'CA' else -30.0
     CRITIC_LOSS_COEF = 0.5
     ENTROPY_LOSS_COEF = 0.01
-    FEATURE_NAMES = "['PFlow_Clean', 'Abdomen_Clean', 'Ratio', 'SaO2_Deriv', 'PFlow_Var', 'Vitalog2']"
+    FEATURE_NAMES = [
+    'PFlow_Clean', 
+    'Thorax_Width', 
+    'Abdomen_Width', 
+    'SaO2_Smooth', 
+    'Effort_Flow_Ratio',
+    'SaO2_Deriv'
+]
     
     # Environment Rewards Setup (Based on Target)
-    ENV_REWARD_APNEA = 15.0 if TARGET_TYPE == 'CA' else 20.0
-    ENV_PENALTY_MISS = 15.0
-    ENV_PENALTY_FA = 15.0 if TARGET_TYPE == 'CA' else 50.0
+    ENV_REWARD_APNEA = 15.0 if TARGET_TYPE == 'CA' else 15.0
+    ENV_PENALTY_MISS = 5.0
+    ENV_PENALTY_FA = 15.0 if TARGET_TYPE == 'CA' else 10.0
 
     # Pass the tracked rewards to the environment
     env = ApneaEnv(target_type=TARGET_TYPE, 
@@ -127,24 +134,51 @@ def train_ppo_rlhf():
                     print(f"\n[!] [ACTIVE LEARNING {questions_asked_this_epoch+1}/{MAX_QUESTIONS_PER_EPOCH}]")
                     print(f"AI Confidence ({mean_confidence:.2f}): Checking {real_start_time:.1f}s to {real_end_time:.1f}s.")
 
-                    feature_names = ['PFlow_Clean', 'Abdomen_Clean', 'Ratio', 'SaO2_Deriv', 'PFlow_Var', 'Vitalog2']
-                    if INPUT_CHANNELS == 7: feature_names.append('Heart_Rate')
+                    # --- NEW PLOTTING LOGIC ---
+                    vis_names = ['PFlow_Clean', 'Thorax_Clean', 'Abdomen_Clean', 'SaO2_Smooth']
+                    vis_signals = info["vis_data"] # Pull the 4 channels (PFlow, Thorax, Abdomen, SaO2)
+                    
+                    # Pull the Ratio directly from the environment's raw data (Index 6 of your 8-channel array)
+                    ratio_signal = env.X[current_seg_idx, :, 6] 
 
-                    fig, axes = plt.subplots(INPUT_CHANNELS, 1, figsize=(12, 2 * INPUT_CHANNELS), sharex=True)
+                    # Create exactly 5 subplots
+                    fig, axes = plt.subplots(5, 1, figsize=(14, 12), sharex=True)
                     plot_color = 'red' if TARGET_TYPE == 'CA' else 'orange'
 
-                    for i, ax in enumerate(axes):
-                        sig = obs[0, :, i].cpu().numpy()
-                        ax.plot(time_axis, sig, color='blue', alpha=0.7)
+                    # 1. PFlow
+                    axes[0].plot(time_axis, vis_signals[:, 0], color='blue', alpha=0.7)
+                    axes[0].fill_between(time_axis, np.min(vis_signals[:, 0]), np.max(vis_signals[:, 0]), 
+                                         where=(plot_action_numpy == 1), color=plot_color, alpha=0.3, label=f'AI Pred: {TARGET_TYPE}')
+                    axes[0].set_ylabel('PFlow_Clean')
+                    axes[0].legend(loc='upper right')
+                    axes[0].set_title(f"Clinical Review: Segment {current_seg_idx}")
 
-                        # Highlight the AI's binary guess
-                        ax.fill_between(time_axis, np.min(sig), np.max(sig), where=(plot_action_numpy == 1), color=plot_color, alpha=0.3, label=f'AI Pred: {TARGET_TYPE}' if i==0 else "")
-                        
-                        ax.set_ylabel(feature_names[i])
+                    # 2. Thorax
+                    axes[1].plot(time_axis, vis_signals[:, 1], color='green', alpha=0.7)
+                    axes[1].fill_between(time_axis, np.min(vis_signals[:, 1]), np.max(vis_signals[:, 1]), 
+                                         where=(plot_action_numpy == 1), color=plot_color, alpha=0.3)
+                    axes[1].set_ylabel('Thorax_Clean')
+
+                    # 3. Abdomen
+                    axes[2].plot(time_axis, vis_signals[:, 2], color='purple', alpha=0.7)
+                    axes[2].fill_between(time_axis, np.min(vis_signals[:, 2]), np.max(vis_signals[:, 2]), 
+                                         where=(plot_action_numpy == 1), color=plot_color, alpha=0.3)
+                    axes[2].set_ylabel('Abdomen_Clean')
+
+                    # 4. Ratio (The OSA Savior)
+                    axes[3].plot(time_axis, ratio_signal, color='darkred', alpha=0.8)
+                    axes[3].fill_between(time_axis, np.min(ratio_signal), np.max(ratio_signal), 
+                                         where=(plot_action_numpy == 1), color=plot_color, alpha=0.3)
+                    axes[3].set_ylabel('Effort_Flow_Ratio')
+
+                    # 5. SaO2
+                    axes[4].plot(time_axis, vis_signals[:, 3], color='magenta', alpha=0.7)
+                    axes[4].fill_between(time_axis, np.min(vis_signals[:, 3]), np.max(vis_signals[:, 3]), 
+                                         where=(plot_action_numpy == 1), color=plot_color, alpha=0.3)
+                    axes[4].set_ylabel('SaO2_Smooth')
+
+                    for ax in axes:
                         ax.grid(True, alpha=0.3)
-                        if i == 0:
-                            ax.legend(loc='upper right')
-                            ax.set_title(f"Clinical Review: Segment {current_seg_idx}")
 
                     plt.xlabel("Real Elapsed Time (Seconds)")
                     plt.tight_layout()

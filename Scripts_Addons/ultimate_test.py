@@ -2,19 +2,28 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-# 1. Define the model
+# =================================================================
+# --- USER CONTROLS ---
+# =================================================================
+# Change this to 'OSA' or 'CA' to test the specific model!
+TARGET_TYPE = 'OSA' 
+NIGHT_TO_TEST = 1
+# =================================================================
+
+# 1. Define the BINARY model
 class PentaLSTM(nn.Module):
-    def __init__(self, input_size=6, hidden_size=128, num_layers=2):
+    def __init__(self, input_size=12, hidden_size=128, num_layers=2):
         super(PentaLSTM, self).__init__()
         self.lstm = nn.LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, batch_first=True, bidirectional=True)
-        self.fc = nn.Linear(hidden_size * 2, 3)
+        # CHANGED: 3 classes -> 2 classes (Binary)
+        self.fc = nn.Linear(hidden_size * 2, 2)
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
         predictions = self.fc(lstm_out)
         return predictions.permute(0, 2, 1)
 
-# --- THE FIX: Helper function to calculate loss in small bites! ---
+# Helper function to calculate loss in small bites
 def calculate_batched_loss(X_np, Y_np, model, criterion, device, batch_size=64):
     num_samples = len(X_np)
     total_loss = 0.0
@@ -36,27 +45,41 @@ def calculate_batched_loss(X_np, Y_np, model, criterion, device, batch_size=64):
 
 def run_permutation_test():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Running Permutation Importance Test on {device}...")
+    print(f"Running Permutation Importance Test for {TARGET_TYPE} on {device}...")
 
-    # 2. Load the 12-feature data and labels (Keep them on the CPU for now!)
-    X = np.load('X_train_PentaLSTM.npy')
-    Y = np.load('Y_train_Labels.npy').squeeze(-1)
+    # 2. Load the 12-feature data and labels
+    X = np.load(f'X_{NIGHT_TO_TEST}.npy')
+    Y = np.load(f'Y_{TARGET_TYPE}_{NIGHT_TO_TEST}.npy').squeeze(-1)
 
-    # 3. Load the trained 12-feature weights
-    model = PentaLSTM(input_size=6).to(device)
-    model.load_state_dict(torch.load('penta_lstm_weights.pth', map_location=device, weights_only=True))
+    # 3. Load the trained 12-feature Binary weights
+    model = PentaLSTM(input_size=12).to(device)
+    # CHANGED: Dynamically load the correct weights based on TARGET_TYPE
+    weights_path = f'penta_lstm_{TARGET_TYPE}_weights.pth'
+    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
     model.eval()
 
-    class_weights = torch.tensor([1.0, 20.0, 20.0], dtype=torch.float32).to(device)
+    # CHANGED: Binary class weights (0: Normal Breathing, 1: Apnea Event)
+    class_weights = torch.tensor([1.0, 20.0], dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
 
-    # 4. Calculate Baseline Loss (Using the batched helper)
+    # 4. Calculate Baseline Loss
     baseline_loss = calculate_batched_loss(X, Y, model, criterion, device)
     print(f"Baseline Loss (All 12 Features Intact): {baseline_loss:.4f}\n")
 
     # 5. The Scramble Test
     feature_names = [
-        'PFlow_Clean',  'Abdomen_Clean', 'Ratio', 'SaO2_Deriv', 'PFlow_Var','Vitalog2'
+        'PFlow_Clean',           # [0] Band-pass Filtered Airflow
+        'Thorax_Clean',          # [1] Band-pass Filtered Thorax
+        'Abdomen_Clean',         # [2] Band-pass Filtered Abdomen
+        'PFlow_Width',           # [3] Airflow Amplitude (Upper-Lower)
+        'Thorax_Width',          # [4] Thorax Amplitude (Upper-Lower)
+        'Abdomen_Width',         # [5] Abdomen Amplitude (Upper-Lower)
+        'SaO2_Smooth',           # [6] Smoothed Oxygen Saturation
+        'Thorax_Abdomen_Corr',   # [7] Thorax-Abdomen Correlation
+        'Effort_Flow_Ratio',     # [8] Effort/Flow Ratio
+        'SaO2_Deriv',            # [9] Rate of Desaturation
+        'Phase_Angle',           # [10] Thorax-Abdomen Phase Angle
+        'PFlow_Var'              # [11] Airflow Rolling Variance
     ]
     
     importances = {}
@@ -68,7 +91,7 @@ def run_permutation_test():
         # Completely randomize/shuffle the data for THIS specific feature
         np.random.shuffle(X_scrambled[:, :, i])
         
-        # Calculate the new loss using the batched helper!
+        # Calculate the new loss
         scrambled_loss = calculate_batched_loss(X_scrambled, Y, model, criterion, device)
             
         # Importance = How much worse did the model get when this feature was destroyed?

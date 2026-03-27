@@ -11,7 +11,7 @@ def apply_cleanup_filter(predictions, min_length_frames=320):
             cleaned[labeled_array == i] = 0
     return cleaned
 
-def evaluate_clinical_events(predictions, ground_truth, min_length=250, overlap_threshold=0.30):
+def evaluate_clinical_events(predictions, ground_truth, min_length=320, overlap_threshold=0.30):
     preds_clean = apply_cleanup_filter(predictions, min_length)
     
     true_events, num_true = label(ground_truth == 1)
@@ -51,7 +51,7 @@ def evaluate_clinical_events(predictions, ground_truth, min_length=250, overlap_
         "f1_score": float(f1)
     }
 
-def evaluate_full_night(model, night_num, target_type, device, input_channels=6):
+def evaluate_full_night(model, night_num, target_type, device):
     """
     Runs inference on the full night, stitches the overlapping arrays, 
     and calculates clinical metrics.
@@ -62,6 +62,9 @@ def evaluate_full_night(model, night_num, target_type, device, input_channels=6)
     X = np.load(f'X_{night_num}.npy')
     Y_true = np.load(f'Y_{target_type}_{night_num}.npy')
     
+    # CHANGED: Define the 5 AI indices to slice the 7-channel array
+    ai_indices = [0, 3, 4, 5, 6, 7]
+    
     num_segments = len(X)
     batch_size = 64
     probs = np.zeros((num_segments, 960))
@@ -70,7 +73,10 @@ def evaluate_full_night(model, night_num, target_type, device, input_channels=6)
     with torch.no_grad():
         for i in range(0, num_segments, batch_size):
             end_idx = min(i + batch_size, num_segments)
-            batch_x = torch.tensor(X[i:end_idx], dtype=torch.float32).to(device)
+            
+            # CHANGED: Slice the batch to only include the 5 AI channels
+            batch_x = torch.tensor(X[i:end_idx, :, ai_indices], dtype=torch.float32).to(device)
+            
             logits, _ = model(batch_x)
             probs[i:end_idx] = torch.softmax(logits, dim=-1)[:, :, 1].cpu().numpy()
 
@@ -103,12 +109,12 @@ def evaluate_full_night(model, night_num, target_type, device, input_channels=6)
 # ==========================================
 if __name__ == "__main__":
     # Test your actual files!
-    TEST_NIGHT = 2
-    TEST_TARGET = 'CA'
+    TEST_NIGHT = 1
+    TEST_TARGET = 'OSA'
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # Load your actual RLHF weights
+    # CHANGED: Update input_size to 6 to match the new Core architecture
     model = ActorCriticLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
     weights_path = f'rlhf_penta_lstm_{TEST_TARGET}_weights.pth'
     model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
