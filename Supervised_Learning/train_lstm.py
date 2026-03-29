@@ -7,8 +7,8 @@ from torch.utils.data import Dataset, DataLoader
 # --- USER CONTROLS ---
 # =================================================================
 # Change this to 'OSA' or 'CA' to train the specific model!
-TARGET_TYPE = 'CA' 
-NIGHT_TO_TEST = 2
+TARGET_TYPE = 'OSA' 
+NIGHT_TO_TEST = 1
 # =================================================================
 
 class ApneaDataset(Dataset):
@@ -25,25 +25,53 @@ class ApneaDataset(Dataset):
         # ONLY return the 5 AI channels!
         return self.x[idx, :, self.ai_indices], self.y[idx]
 
-class PentaLSTM(nn.Module):
+class ConvLSTM(nn.Module):
     def __init__(self, input_size=6, hidden_size=128, num_layers=2):
-        super(PentaLSTM, self).__init__()
+        super(ConvLSTM, self).__init__()
+        
+        # 1. The CNN Front-End (The "Eyes")
+        # Takes your 6 raw channels and learns 32 complex spatial features
+        self.cnn = nn.Sequential(
+            # kernel_size=7 looks at ~0.2 seconds of data at once (at 32Hz)
+            nn.Conv1d(in_channels=input_size, out_channels=32, kernel_size=7, padding=3),
+            nn.BatchNorm1d(32), # Batch normalization helps it train incredibly fast
+            nn.ReLU(),
+            
+            nn.Conv1d(in_channels=32, out_channels=32, kernel_size=3, padding=1),
+            nn.BatchNorm1d(32),
+            nn.ReLU()
+        )
+        
+        # 2. The LSTM Back-End (The "Memory")
+        # Notice the input_size is now 32 (fed by the CNN), not 6!
         self.lstm = nn.LSTM(
-            input_size=input_size, 
+            input_size=32, 
             hidden_size=hidden_size, 
             num_layers=num_layers, 
             batch_first=True,
             bidirectional=True 
         )
         
-        # CHANGED: Output 2 classes (0=Normal Breathing, 1=Apnea Event)
+        # 3. The Classification Head
         self.fc = nn.Linear(hidden_size * 2, 2)
 
     def forward(self, x):
-        lstm_out, _ = self.lstm(x)
+        # x comes in as (Batch, Timesteps, Channels) -> e.g., (32, 960, 6)
+        
+        # PyTorch Conv1d expects (Batch, Channels, Timesteps), so we flip it
+        x = x.permute(0, 2, 1) 
+        
+        # Extract features with CNN
+        cnn_features = self.cnn(x)
+        
+        # Flip it back for the LSTM -> (Batch, Timesteps, Features)
+        cnn_features = cnn_features.permute(0, 2, 1)
+        
+        # Pass through the rest of your normal architecture
+        lstm_out, _ = self.lstm(cnn_features)
         predictions = self.fc(lstm_out) 
         
-        # PyTorch CrossEntropy expects shape: (Batch, Classes, Timesteps)
+        # (Batch, Classes, Timesteps) for CrossEntropyLoss
         predictions = predictions.permute(0, 2, 1)
         
         return predictions
@@ -56,9 +84,9 @@ def train_model():
     dataset = ApneaDataset(f'X_{NIGHT_TO_TEST}.npy', y_filename)
     dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
     
-    model = PentaLSTM().to(device)
+    model = ConvLSTM().to(device)
     
-    class_weights = torch.tensor([1.0, 5], dtype=torch.float32).to(device)
+    class_weights = torch.tensor([1.0, 20], dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     
     # 2. Bumped LR slightly to help it find the path

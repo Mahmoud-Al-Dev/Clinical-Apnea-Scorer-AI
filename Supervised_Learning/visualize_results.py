@@ -2,13 +2,13 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from train_lstm import PentaLSTM 
+from train_lstm import ConvLSTM 
 
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
 TARGET_TIME_SEC =  6296
-NIGHT_TO_TEST = 2  # Change this to 1 or 2 to switch patients!
+NIGHT_TO_TEST = 1  # Change this to 1 or 2 to switch patients!
 # ==========================================
 
 print(f"1. Loading Data for Night {NIGHT_TO_TEST}...")
@@ -29,11 +29,11 @@ real_end = segment_times[seg_idx, -1]
 print(f"✅ Target time {TARGET_TIME_SEC}s found in Segment {seg_idx} ({real_start:.1f}s to {real_end:.1f}s)")
 
 print("3. Loading Binary Models...")
-model_ca = PentaLSTM(input_size=6, hidden_size=128, num_layers=2)
+model_ca = ConvLSTM(input_size=6, hidden_size=128, num_layers=2)
 model_ca.load_state_dict(torch.load('penta_lstm_CA_weights.pth', map_location=torch.device('cpu'), weights_only=True))
 model_ca.eval()
 
-model_osa = PentaLSTM(input_size=6, hidden_size=128, num_layers=2)
+model_osa = ConvLSTM(input_size=6, hidden_size=128, num_layers=2)
 model_osa.load_state_dict(torch.load('penta_lstm_OSA_weights.pth', map_location=torch.device('cpu'), weights_only=True))
 model_osa.eval()
 

@@ -1,41 +1,84 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from train_lstm import PentaLSTM
 from scipy.ndimage import label
 
-print("1. Loading Data and Models...")
-NIGHT_TO_TEST = 2  # Change this to 1 or 2 to switch patients!
+from train_lstm import ConvLSTM # <-- Uses your SFT model
+
+# ==========================================
+# --- USER CONTROLS ---
+# ==========================================
+NIGHT_TO_TEST = 1       
+
+MODEL_CHANNELS = 6      # What the AI was trained on
+TOTAL_X_CHANNELS = 8    # What is actually stored in X_1.npy
+
+# 1. THE AI SLICE (Must match self.ai_indices from apnea_env.py)
+AI_INDICES = [0, 3, 4, 5, 6, 7]
+
+# Set your exact time window here. Set to None to plot the entire night.
+WINDOW_START_SEC = None
+WINDOW_END_SEC = None
+
+# 2. THE VISUALIZATION SLICE (The 4 channels you actually want to see)
+VISUALIZE_INDICES = [0, 1, 2, 5]  
+
+VISUALIZE_NAMES = [
+    'PFlow_Clean',       
+    'Thorax_Clean',      
+    'Abdomen_Clean',     
+    'SaO2_Smooth',       
+]
+# ==========================================
 
 print(f"1. Loading Data for Night {NIGHT_TO_TEST}...")
-# Dynamically load the specific night's files based on your folder structure
 X = np.load(f'X_{NIGHT_TO_TEST}.npy')
 segment_times = np.load(f'segment_times_n{NIGHT_TO_TEST}.npy')
-
 Y_true_CA = np.load(f'Y_CA_{NIGHT_TO_TEST}.npy')
 Y_true_OSA = np.load(f'Y_OSA_{NIGHT_TO_TEST}.npy')
-model_ca = PentaLSTM(input_size=6, hidden_size=128, num_layers=2)
-model_ca.load_state_dict(torch.load('penta_lstm_CA_weights.pth', map_location=torch.device('cpu'), weights_only=True))
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+print("2. Loading Dual Binary SFT Agents (PentaLSTM)...")
+model_ca = ConvLSTM(input_size=MODEL_CHANNELS, hidden_size=128, num_layers=2).to(device)
+model_ca.load_state_dict(torch.load('penta_lstm_CA_weights.pth', map_location=device, weights_only=True))
 model_ca.eval()
 
-model_osa = PentaLSTM(input_size=6, hidden_size=128, num_layers=2)
-model_osa.load_state_dict(torch.load('penta_lstm_OSA_weights.pth', map_location=torch.device('cpu'), weights_only=True))
+model_osa = ConvLSTM(input_size=MODEL_CHANNELS, hidden_size=128, num_layers=2).to(device)
+model_osa.load_state_dict(torch.load('penta_lstm_OSA_weights.pth', map_location=device, weights_only=True))
 model_osa.eval()
 
-print("2. Running AI Prediction on ALL segments...")
-input_tensor = torch.tensor(X, dtype=torch.float32)
-with torch.no_grad():
-    # Get probabilities for Class 1 (Apnea) for both models
-    probs_ca = torch.softmax(model_ca(input_tensor), dim=1)[:, 1, :].numpy() 
-    probs_osa = torch.softmax(model_osa(input_tensor), dim=1)[:, 1, :].numpy() 
+print("3. Running SFT Prediction on ALL segments (Batch Processing)...")
+batch_size = 64  
+num_segments = len(X)
+probs_ca = np.zeros((num_segments, 960))
+probs_osa = np.zeros((num_segments, 960))
 
-print("3. Stitching overlapping segments back together...")
+with torch.no_grad():
+    for i in range(0, num_segments, batch_size):
+        end_idx = min(i + batch_size, num_segments)
+        
+        # Slice X down to the 6 channels the AI expects before making the tensor!
+        x_sliced_for_ai = X[i:end_idx][:, :, AI_INDICES] 
+        batch_x = torch.tensor(x_sliced_for_ai, dtype=torch.float32).to(device)
+        
+        # ConvLSTM outputs shape (Batch, Classes, Timesteps) -> dim=1 gets classes[cite: 10]
+        logits_ca = model_ca(batch_x)
+        probs_ca[i:end_idx] = torch.softmax(logits_ca, dim=1)[:, 1, :].cpu().numpy()
+        
+        logits_osa = model_osa(batch_x)
+        probs_osa[i:end_idx] = torch.softmax(logits_osa, dim=1)[:, 1, :].cpu().numpy()
+        
+        if i % 512 == 0:
+            print(f"   Processed {i}/{num_segments} segments...")
+
+print("4. Stitching the overlapping segments back together (All Channels)...")
 win_samples = 960
 step_samples = 640 
-num_segments = len(X)
 total_samples = step_samples * (num_segments - 1) + win_samples
 
-full_pflow = np.zeros(total_samples)
+# Holds all channels for stitching so the visualizer has access to everything
+full_features = np.zeros((total_samples, TOTAL_X_CHANNELS))
 full_time = np.zeros(total_samples)
 
 full_y_ca = np.zeros(total_samples)
@@ -49,7 +92,8 @@ for i in range(num_segments):
     start_idx = i * step_samples
     end_idx = start_idx + win_samples
     
-    full_pflow[start_idx:end_idx] += X[i, :, 0]
+    # Stitch all 8 channels for the plot[cite: 9]
+    full_features[start_idx:end_idx, :] += X[i, :, :]
     full_time[start_idx:end_idx] = segment_times[i] 
     
     full_y_ca[start_idx:end_idx] = np.maximum(full_y_ca[start_idx:end_idx], Y_true_CA[i].flatten())
@@ -59,40 +103,92 @@ for i in range(num_segments):
     full_probs_osa[start_idx:end_idx] += probs_osa[i]
     overlap_counts[start_idx:end_idx] += 1
 
-full_pflow /= overlap_counts
+# Average the overlapping areas
+full_features /= overlap_counts[:, None] 
 full_probs_ca /= overlap_counts
 full_probs_osa /= overlap_counts
 
-# Convert averaged probabilities back to binary decisions (Threshold > 0.5)
 full_classes_ca = (full_probs_ca > 0.5).astype(int)
 full_classes_osa = (full_probs_osa > 0.5).astype(int)
 
-print("4. Applying 10-second clinical cleanup filter...")
+print("5. Applying the 10-second Clinical Cleanup Filter...")
 labeled_ca, num_ca = label(full_classes_ca == 1)
 for i in range(1, num_ca + 1):
-    if (labeled_ca == i).sum() < 250:
+    if (labeled_ca == i).sum() < 320: 
         full_classes_ca[labeled_ca == i] = 0
 
 labeled_osa, num_osa = label(full_classes_osa == 1)
 for i in range(1, num_osa + 1):
-    if (labeled_osa == i).sum() < 250:
+    if (labeled_osa == i).sum() < 320:
         full_classes_osa[labeled_osa == i] = 0
 
-print("5. Plotting the full night timeline...")
-plt.figure(figsize=(20, 6)) 
+# =========================================================
+# 6. Apply Time Window Masking
+# =========================================================
+print("6. Filtering Time Window...")
+mask = np.ones(len(full_time), dtype=bool)
 
-plt.plot(full_time, full_pflow, label='PFlow', color='blue', alpha=0.5, linewidth=0.5)
+if WINDOW_START_SEC is not None:
+    mask &= (full_time >= WINDOW_START_SEC)
+if WINDOW_END_SEC is not None:
+    mask &= (full_time <= WINDOW_END_SEC)
 
-plt.fill_between(full_time, 0, full_y_ca, color='gray', alpha=0.4, label='Doctor: CA')
-plt.fill_between(full_time, 0, full_y_osa, color='cyan', alpha=0.4, label='Doctor: OSA')
+# Slice all arrays using the mask[cite: 9]
+plot_time = full_time[mask]
+plot_features = full_features[mask, :] 
+plot_y_ca = full_y_ca[mask]
+plot_y_osa = full_y_osa[mask]
+plot_classes_ca = full_classes_ca[mask]
+plot_classes_osa = full_classes_osa[mask]
 
-plt.plot(full_time, full_classes_ca, color='red', linewidth=1.5, label='AI: CA')
-plt.plot(full_time, full_classes_osa * 1.05, color='orange', linewidth=1.5, label='AI: OSA')
+# Extract and Print Exact AI Event Timestamps
+print("\n" + "="*50)
+print(f"--- SFT Predicted Events in Window {WINDOW_START_SEC}s - {WINDOW_END_SEC}s ---")
 
-plt.title("Full Night Dual-Model AI Apnea Detection")
-plt.xlabel("Real Elapsed Time (Seconds)")
-plt.ylabel("Apnea Events")
-plt.legend(loc='upper right')
-plt.grid(True, alpha=0.3)
-plt.tight_layout()
+def print_event_times(classes_array, time_array, label_name):
+    labeled_events, num_events = label(classes_array == 1)
+    print(f"\n{label_name} Predictions ({num_events}):")
+    if num_events == 0:
+        print("  None detected in this window.")
+    for i in range(1, num_events + 1):
+        event_times = time_array[labeled_events == i]
+        start_t, end_t = event_times[0], event_times[-1]
+        print(f"  - Event {i}: Start: {start_t:.2f}s | End: {end_t:.2f}s | Duration: {(end_t - start_t):.2f}s")
+
+print_event_times(plot_classes_ca, plot_time, "CA (Red)")
+print_event_times(plot_classes_osa, plot_time, "OSA (Orange)")
+print("="*50 + "\n")
+
+# =========================================================
+# 7. Plotting ONLY the Chosen Channels
+# =========================================================
+num_plots = len(VISUALIZE_INDICES)
+print(f"7. Plotting the {num_plots} chosen channels...")
+
+fig, axes = plt.subplots(num_plots, 1, figsize=(20, 3 * num_plots), sharex=True)
+
+window_title = f"({WINDOW_START_SEC}s - {WINDOW_END_SEC}s)" if WINDOW_START_SEC else "(Full Night)"
+fig.suptitle(f"Full Night SFT Apnea Detection (PentaLSTM) - Night {NIGHT_TO_TEST} {window_title}", fontsize=16)
+
+for i, ax in enumerate(axes):
+    actual_channel_idx = VISUALIZE_INDICES[i]
+    sig = plot_features[:, actual_channel_idx]
+    
+    ax.plot(plot_time, sig, color='blue', alpha=0.6, linewidth=1.0)
+    
+    ax.fill_between(plot_time, np.min(sig), np.max(sig), where=(plot_y_ca == 1), color='gray', alpha=0.3, label='Doctor: CA' if i==0 else "")
+    ax.fill_between(plot_time, np.min(sig), np.max(sig), where=(plot_y_osa == 1), color='cyan', alpha=0.3, label='Doctor: OSA' if i==0 else "")
+    
+    sig_max = np.max(sig)
+    ax.plot(plot_time, plot_classes_ca * sig_max * 0.8, color='red', linewidth=2.0, label='SFT: CA' if i==0 else "")
+    ax.plot(plot_time, plot_classes_osa * sig_max * 0.9, color='orange', linewidth=2.0, label='SFT: OSA' if i==0 else "")
+    
+    ax.set_ylabel(VISUALIZE_NAMES[i], fontsize=10)
+    ax.grid(True, alpha=0.3)
+    
+    if i == 0:
+        ax.legend(loc='upper right')
+
+plt.xlabel("Real Elapsed Time (Seconds)", fontsize=12)
+plt.tight_layout(rect=[0, 0.03, 1, 0.98]) 
 plt.show()
