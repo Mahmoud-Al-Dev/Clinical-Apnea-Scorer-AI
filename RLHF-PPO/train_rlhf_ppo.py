@@ -8,7 +8,7 @@ import mlflow
 import mlflow.pytorch
 
 mlflow.set_tracking_uri("file:./mlruns")
-mlflow.set_experiment("Sleep_Apnea_RLHF_Night_2")
+mlflow.set_experiment("Sleep_Apnea_RLHF_1Night_2")
 
 from apnea_env import ApneaEnv
 from actor_critic_lstm import ActorCriticLSTM, load_pretrained_supervised_weights

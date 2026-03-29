@@ -7,8 +7,8 @@ from train_lstm import PentaLSTM
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TIME_SEC =  13324
-NIGHT_TO_TEST = 1  # Change this to 1 or 2 to switch patients!
+TARGET_TIME_SEC =  6296
+NIGHT_TO_TEST = 2  # Change this to 1 or 2 to switch patients!
 # ==========================================
 
 print(f"1. Loading Data for Night {NIGHT_TO_TEST}...")

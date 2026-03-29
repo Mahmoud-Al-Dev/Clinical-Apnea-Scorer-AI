@@ -8,7 +8,7 @@ from actor_critic_lstm import ActorCriticLSTM
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-NIGHT_TO_TEST = 2       
+NIGHT_TO_TEST = 1       
 
 MODEL_CHANNELS = 6      # What the AI was trained on
 TOTAL_X_CHANNELS = 8    # What is actually stored in X_2.npy
@@ -17,8 +17,8 @@ TOTAL_X_CHANNELS = 8    # What is actually stored in X_2.npy
 AI_INDICES = [0, 3, 4, 5, 6, 7]
 
 # Set your exact time window here. Set to None to plot the entire night.
-WINDOW_START_SEC = 10450
-WINDOW_END_SEC = 10950
+WINDOW_START_SEC = None
+WINDOW_END_SEC = None
 
 # 2. THE VISUALIZATION SLICE (The 4 you actually want to see)
 VISUALIZE_INDICES = [0, 1, 2, 5]  

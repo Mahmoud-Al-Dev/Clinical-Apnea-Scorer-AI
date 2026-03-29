@@ -109,8 +109,8 @@ def evaluate_full_night(model, night_num, target_type, device):
 # ==========================================
 if __name__ == "__main__":
     # Test your actual files!
-    TEST_NIGHT = 1
-    TEST_TARGET = 'OSA'
+    TEST_NIGHT = 2
+    TEST_TARGET = 'CA'
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     

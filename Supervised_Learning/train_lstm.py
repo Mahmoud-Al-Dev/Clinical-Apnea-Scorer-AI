@@ -7,8 +7,8 @@ from torch.utils.data import Dataset, DataLoader
 # --- USER CONTROLS ---
 # =================================================================
 # Change this to 'OSA' or 'CA' to train the specific model!
-TARGET_TYPE = 'OSA' 
-NIGHT_TO_TEST = 1
+TARGET_TYPE = 'CA' 
+NIGHT_TO_TEST = 2
 # =================================================================
 
 class ApneaDataset(Dataset):
@@ -16,7 +16,7 @@ class ApneaDataset(Dataset):
         self.x = torch.tensor(np.load(x_file), dtype=torch.float32)
         self.y = torch.tensor(np.load(y_file), dtype=torch.long).squeeze(-1)
         
-        # Mapping the 7-channel array to the 5 AI channels
+        # Mapping the 7-channel array to the 6 AI channels
         self.ai_indices = [0, 3, 4, 5, 6, 7]
         
     def __len__(self): return len(self.x)
@@ -58,13 +58,12 @@ def train_model():
     
     model = PentaLSTM().to(device)
     
-    # 1. Lowered the panic weight. 5.0 is plenty to make it care about OSA.
-    class_weights = torch.tensor([1.0, 5.0], dtype=torch.float32).to(device)
+    class_weights = torch.tensor([1.0, 5], dtype=torch.float32).to(device)
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     
     # 2. Bumped LR slightly to help it find the path
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    epochs = 50
+    epochs = 100
     
     for epoch in range(epochs):
         model.train() 
@@ -74,8 +73,20 @@ def train_model():
             
             predictions = model(batch_x.to(device))
             
-            # 3. Pure, unadulterated Cross Entropy. No flicker penalty.
-            loss = criterion(predictions, batch_y.to(device))
+            # 1. Standard Cross Entropy Loss
+            ce_loss = criterion(predictions, batch_y.to(device))
+            
+            # 2. THE FLICKER PENALTY (Temporal Continuity Loss)
+            # Convert logits to probabilities
+            probs = torch.softmax(predictions, dim=1) 
+            # Isolate the probabilities for the 'Apnea' class (index 1)
+            apnea_probs = probs[:, 1, :] 
+            
+            # Calculate the absolute difference between adjacent timesteps
+            flicker_penalty = torch.mean(torch.abs(apnea_probs[:, 1:] - apnea_probs[:, :-1]))
+            
+            # 3. Combine them (lambda = 0.5 is a good starting point)
+            loss = ce_loss + (0.5 * flicker_penalty)
 
             loss.backward()
             

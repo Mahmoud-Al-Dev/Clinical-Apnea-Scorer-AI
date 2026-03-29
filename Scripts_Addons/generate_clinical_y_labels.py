@@ -4,7 +4,7 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data\ON020217-06.TXT'  
+TXT_FILE_PATH = 'Data\ON030217-06.TXT'  
 SEGMENT_TIMES_PATH = 'segment_times.npy'
 # ==========================================
 
@@ -59,7 +59,7 @@ for line in lines:
                 # Route the event to the correct list
                 if event_str == 'CA':
                     events_ca.append((start_t, end_t))
-                elif event_str in ['OH', 'OA']: # Catching both Obstructive Hypopnea and Apnea
+                elif event_str in ['OH', 'OA', 'OSA']: # Catching both Obstructive Hypopnea and Apnea
                     events_osa.append((start_t, end_t))
                 else:
                     continue # Skip everything else
