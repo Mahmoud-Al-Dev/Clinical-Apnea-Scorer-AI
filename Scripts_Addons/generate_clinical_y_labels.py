@@ -4,8 +4,8 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data\ON030217-06.TXT'  
-SEGMENT_TIMES_PATH = 'segment_times.npy'
+TXT_FILE_PATH = 'Data\ST300317-06.TXT'  
+SEGMENT_TIMES_PATH = 'segment_times_n3.npy'
 # ==========================================
 
 print("1. Loading saved segment timeline...")

@@ -3,13 +3,15 @@ import numpy as np
 import os
 import cleanlab
 from cleanlab.filter import find_label_issues
-from actor_critic_lstm import ActorCriticLSTM 
+
+# CHANGED: Import your ConvLSTM 
+from train_lstm import ConvLSTM
 
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'OSA'    
-CLEAN_TEACHER_WEIGHTS = f'rlhf_penta_lstm_{TARGET_TYPE}_weights.pth' # Your newly trained pristine model
+TARGET_TYPE = 'CA'    
+CLEAN_TEACHER_WEIGHTS = f'penta_lstm_{TARGET_TYPE}_weights.pth' # Your newly trained pristine model
 NOISY_NIGHT_ID = 3 # The night we want to clean next
 # ==========================================
 
@@ -28,7 +30,7 @@ def run_cleanlab():
     Y_noisy_segment = np.any(Y_noisy_raw == 1, axis=1).astype(int).flatten()
     
     # 3. Load the Pristine Teacher Model
-    agent = ActorCriticLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
+    agent = ConvLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
     agent.load_state_dict(torch.load(CLEAN_TEACHER_WEIGHTS, map_location=device, weights_only=True))
     agent.eval()
     
@@ -41,13 +43,17 @@ def run_cleanlab():
             obs = X_noisy[i][:, ai_indices].astype(np.float32)
             obs_tensor = torch.tensor(obs).unsqueeze(0).to(device)
             
-            # Get logits and convert to probabilities
-            action_logits, _ = agent(obs_tensor)
-            probs = torch.softmax(action_logits, dim=-1)[0].cpu().numpy() # Shape: (960, 2)
+            # --- THE FIX: ConvLSTM logic ---
+            # SFT model only returns logits (not a tuple)
+            logits = agent(obs_tensor) 
+            
+            # ConvLSTM shape is (Batch, Classes, Timesteps) -> (1, 2, 960)
+            # We softmax on dim=1 to get probabilities
+            probs = torch.softmax(logits, dim=1)[0].cpu().numpy() # Shape: (2, 960)
             
             # We want the Segment Probability. 
             # We take the MAXIMUM probability of Apnea (class index 1) across the 960 timesteps.
-            prob_apnea = np.max(probs[:, 1])
+            prob_apnea = np.max(probs[1, :]) 
             prob_normal = 1.0 - prob_apnea
             
             pred_probs.append([prob_normal, prob_apnea])

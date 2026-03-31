@@ -13,7 +13,7 @@ def apply_cleanup_filter(predictions, min_length_frames=320):
             cleaned[labeled_array == i] = 0
     return cleaned
 
-def evaluate_clinical_events(predictions, ground_truth, min_length=320, overlap_threshold=0.30):
+def evaluate_clinical_events(predictions, ground_truth, min_length=320, overlap_threshold=0.10):
     preds_clean = apply_cleanup_filter(predictions, min_length)
     
     true_events, num_true = label(ground_truth == 1)
@@ -60,23 +60,23 @@ def evaluate_full_night(model, night_num, target_type, device):
     """
     model.eval()
     
-    # 1. Load Data[cite: 10]
+    # 1. Load Data
     X = np.load(f'X_{night_num}.npy')
     Y_true = np.load(f'Y_{target_type}_{night_num}.npy')
     
-    # The 6 AI indices to slice the array[cite: 10]
+    # The 6 AI indices to slice the array
     ai_indices = [0, 3, 4, 5, 6, 7]
     
     num_segments = len(X)
     batch_size = 64
     probs = np.zeros((num_segments, 960))
     
-    # 2. Batch Inference[cite: 10]
+    # 2. Batch Inference
     with torch.no_grad():
         for i in range(0, num_segments, batch_size):
             end_idx = min(i + batch_size, num_segments)
             
-            # Slice the batch to only include the AI channels[cite: 10]
+            # Slice the batch to only include the AI channels
             batch_x = torch.tensor(X[i:end_idx, :, ai_indices], dtype=torch.float32).to(device)
             
             # CHANGED: SFT Model only returns logits, no state_value
@@ -85,7 +85,7 @@ def evaluate_full_night(model, night_num, target_type, device):
             # CHANGED: SFT Model outputs (Batch, Classes, Timesteps), so we use dim=1
             probs[i:end_idx] = torch.softmax(logits, dim=1)[:, 1, :].cpu().numpy()
 
-    # 3. Stitching overlaps (640 step, 960 window)[cite: 10]
+    # 3. Stitching overlaps (640 step, 960 window)
     win_samples = 960
     step_samples = 640 
     total_samples = step_samples * (num_segments - 1) + win_samples
@@ -105,7 +105,7 @@ def evaluate_full_night(model, night_num, target_type, device):
     full_probs /= overlap_counts
     full_classes = (full_probs > 0.5).astype(int)
 
-    # 4. Run the overlap math[cite: 10]
+    # 4. Run the overlap math
     return evaluate_clinical_events(full_classes, full_y)
 
 
@@ -113,7 +113,7 @@ def evaluate_full_night(model, night_num, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__":
-    TEST_NIGHT = 4
+    TEST_NIGHT = 1
     TEST_TARGET = 'OSA'  # Change to 'OSA' as needed
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

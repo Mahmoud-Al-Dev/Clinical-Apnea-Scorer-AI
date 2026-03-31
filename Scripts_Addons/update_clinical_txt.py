@@ -4,33 +4,36 @@ import os
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'OSA'
-NIGHT_ID = 1
+TARGET_TYPE = 'CA'
+NIGHT_ID = 3
 SAMPLING_RATE = 32 # 32 Hz
 
-# File paths
-cleaned_segments_path = f'Y_{TARGET_TYPE}_{NIGHT_ID}_CLEAN.npy'
+cleaned_segments_path = f'Y_{TARGET_TYPE}_{NIGHT_ID}_SILVER.npy'
+original_segments_path = f'Y_{TARGET_TYPE}_{NIGHT_ID}.npy'
 segment_times_path = f'segment_times_n{NIGHT_ID}.npy'
-original_txt_path = r'Data\ON020217-06.TXT' 
-output_txt_path = f'ON020217-06_{TARGET_TYPE}_CLEANED.TXT'
+
+original_txt_path = r'Data\ST300317-06.TXT' 
+output_txt_path = f'ST300317-06_{TARGET_TYPE}_CLEANED.TXT'
 
 def generate_cleaned_clinical_report():
-    print(f"--- Generating Updated Clinical Report for Night {NIGHT_ID} ---")
+    print(f"--- Chronologically Integrating AI Discoveries for Night {NIGHT_ID} ---")
     
-    # 1. Load the cleaned numpy arrays
     Y_clean = np.load(cleaned_segments_path)
+    Y_orig = np.load(original_segments_path)
     segment_times = np.load(segment_times_path)
     
-    # 2. Stitch the overlapping segments into a continuous timeline
+    # Isolate ONLY the new events the AI added.
+    Y_ai_only = np.clip(Y_clean - Y_orig, 0, 1)
+    
     min_time = segment_times[0, 0]
     max_time = segment_times[-1, -1]
     total_samples = int(np.ceil((max_time - min_time) * SAMPLING_RATE)) + 1
     
     continuous_labels = np.zeros(total_samples, dtype=int)
     
-    for i in range(len(Y_clean)):
+    for i in range(len(Y_ai_only)):
         seg_times = segment_times[i]
-        seg_labels = Y_clean[i].flatten()
+        seg_labels = Y_ai_only[i].flatten()
         
         start_idx = int(round((seg_times[0] - min_time) * SAMPLING_RATE))
         end_idx = start_idx + len(seg_labels)
@@ -38,81 +41,101 @@ def generate_cleaned_clinical_report():
         
         continuous_labels[start_idx:end_idx] |= seg_labels[:end_idx-start_idx]
 
-    # 3. Extract continuous events
-    print("Extracting updated events from the continuous timeline...")
     padded = np.pad(continuous_labels, (1, 1), 'constant')
     diffs = np.diff(padded)
-    
     starts = np.where(diffs == 1)[0]
     ends = np.where(diffs == -1)[0]
     
-    events = []
+    # Store AI events as dictionaries
+    ai_events = []
     for s, e in zip(starts, ends):
-        events.append({
+        ai_events.append({
             'start': min_time + (s / SAMPLING_RATE),
-            'duration': (e - s) / SAMPLING_RATE
+            'duration': (e - s) / SAMPLING_RATE,
+            'type': f'{TARGET_TYPE}' # Tag them so they stand out!
         })
 
-    num_events = len(events)
-    print(f"Found {num_events} cleaned {TARGET_TYPE} events.")
+    print(f"Found {len(ai_events)} BRAND NEW AI events to weave into the timeline.")
 
-    # 4. Smart Parsing to Overwrite Original File
-    print(f"Reading original clinical file: {original_txt_path}")
+    # Parse the original file
     with open(original_txt_path, 'r', encoding='utf-8') as file:
         lines = file.readlines()
 
-    in_respiratory_section = False
-    wrote_new_events = False
+    out_lines = []
+    state = 'PRE_TABLE'
+    header_line_idx = -1
+    parsed_original_events = []
+
+    for line in lines:
+        if state == 'PRE_TABLE':
+            if line.startswith("Respiratory/Apnea/Hypopnea"):
+                state = 'IN_HEADER'
+                header_line_idx = len(out_lines)
+                out_lines.append(line) # Placeholder, we will update the count later
+            else:
+                out_lines.append(line)
+
+        elif state == 'IN_HEADER':
+            out_lines.append(line)
+            if line.startswith("---"):
+                state = 'IN_EVENTS'
+
+        elif state == 'IN_EVENTS':
+            # Stop condition for the table
+            if line.strip() == "" or "Sighs" in line or "Body Position" in line:
+                
+                # --- THE MAGIC CHRONOLOGICAL WEAVE ---
+                all_events = parsed_original_events + ai_events
+                all_events.sort(key=lambda x: x['start']) # Sort everything by start time!
+                
+                # Update the header count
+                out_lines[header_line_idx] = f"Respiratory/Apnea/Hypopnea ({len(all_events)} Ereignisse)\n"
+                
+                # Format and write the sorted timeline
+                for j, ev in enumerate(all_events):
+                    idx = j + 1
+                    epoche = int(ev['start'] // 30) + 1
+                    
+                    # Recalculate the interval to the NEXT chronological event
+                    if j < len(all_events) - 1:
+                        interval = f"{(all_events[j+1]['start'] - ev['start']):.3f}"
+                    else:
+                        interval = "-"
+                        
+                    # String formatting to match the clinical layout
+                    idx_str = f"{idx},"
+                    abs_str = "1," 
+                    ep_str = f"{epoche},"
+                    st_str = f"{ev['start']:.3f},"
+                    dur_str = f"{ev['duration']:.3f},"
+                    int_str = f"{interval}," if interval != "-" else "-,"
+                    
+                    event_line = f"{idx_str:<4} {abs_str:<3} {ep_str:<5} {st_str:<12} {dur_str:<10} {int_str:<12} {ev['type']}\n"
+                    out_lines.append(event_line)
+
+                # Table is finished, append the line that broke the loop and switch state
+                out_lines.append(line)
+                state = 'POST_TABLE'
+            else:
+                # Read the doctor's original events and save them to memory
+                parts = [p.strip() for p in line.split(',')]
+                if len(parts) >= 7:
+                    try:
+                        parsed_original_events.append({
+                            'start': float(parts[3]),
+                            'duration': float(parts[4]),
+                            'type': parts[6]
+                        })
+                    except ValueError:
+                        pass # Skip malformed lines if any
+
+        elif state == 'POST_TABLE':
+            out_lines.append(line)
 
     with open(output_txt_path, 'w', encoding='utf-8') as out_file:
-        for line in lines:
-            
-            # STATE 1: Find the header and update the count
-            if line.startswith("Respiratory/Apnea/Hypopnea"):
-                out_file.write(f"Respiratory/Apnea/Hypopnea ({num_events} Ereignisse)\n")
-                in_respiratory_section = True
-                continue
-            
-            # STATE 2: We are in the table header. Copy it, then write OUR events.
-            if in_respiratory_section and not wrote_new_events:
-                out_file.write(line)
-                
-                # The dashed line means the table is starting
-                if line.startswith("---"):
-                    for j, event in enumerate(events):
-                        idx = j + 1
-                        epoch = int(event['start'] // 30) + 1
-                        
-                        if j < len(events) - 1:
-                            interval = f"{(events[j+1]['start'] - event['start']):.3f},"
-                        else:
-                            interval = "-,"
-                        
-                        # Formatting to match the screenshot's columns perfectly
-                        idx_str = f"{idx},"
-                        epoch_str = f"{epoch},"
-                        start_str = f"{event['start']:.3f},"
-                        dur_str = f"{event['duration']:.3f},"
-                        
-                        event_line = f"{idx_str:<4} 1,            {epoch_str:<8} {start_str:<15} {dur_str:<15} {interval:<15} {TARGET_TYPE}\n"
-                        out_file.write(event_line)
-                    
-                    wrote_new_events = True
-                continue
-            
-            # STATE 3: Skip (Delete) the old events
-            if in_respiratory_section and wrote_new_events:
-                # If we hit an empty line or a new section header, the old table is over.
-                if line.strip() == "" or "Sighs" in line or "Body Position" in line:
-                    in_respiratory_section = False
-                    out_file.write(line) 
-                continue 
-            
-            # STATE 4: Write everything else normally
-            if not in_respiratory_section:
-                out_file.write(line)
+        out_file.writelines(out_lines)
 
-    print(f"\n✅ SUCCESS! Old events successfully overwritten. Saved to: {output_txt_path}")
+    print(f"\n✅ SUCCESS! {len(ai_events)} AI events woven chronologically into the original labels. Saved to: {output_txt_path}")
 
 if __name__ == "__main__":
     generate_cleaned_clinical_report()

@@ -54,7 +54,7 @@ def evaluate_clinical_events(predictions, ground_truth, min_length=320, overlap_
 def evaluate_full_night(model, night_num, target_type, device):
     """
     Runs inference on the full night, stitches the overlapping arrays, 
-    and calculates clinical metrics.
+    and calculates clinical metrics. Automatically detects SFT vs RLHF models!
     """
     model.eval()
     
@@ -62,7 +62,7 @@ def evaluate_full_night(model, night_num, target_type, device):
     X = np.load(f'X_{night_num}.npy')
     Y_true = np.load(f'Y_{target_type}_{night_num}.npy')
     
-    # CHANGED: Define the 5 AI indices to slice the 7-channel array
+    # Define the 6 AI indices to slice the array
     ai_indices = [0, 3, 4, 5, 6, 7]
     
     num_segments = len(X)
@@ -74,15 +74,26 @@ def evaluate_full_night(model, night_num, target_type, device):
         for i in range(0, num_segments, batch_size):
             end_idx = min(i + batch_size, num_segments)
             
-            # CHANGED: Slice the batch to only include the 5 AI channels
+            # Slice the batch to only include the AI channels
             batch_x = torch.tensor(X[i:end_idx, :, ai_indices], dtype=torch.float32).to(device)
             
-            logits, _ = model(batch_x)
-            probs[i:end_idx] = torch.softmax(logits, dim=-1)[:, :, 1].cpu().numpy()
+            outputs = model(batch_x)
+            
+            # --- THE MAGIC FIX: Detect Model Type ---
+            if isinstance(outputs, tuple):
+                # It's the RLHF ActorCriticLSTM (returns action_logits, state_value)
+                logits = outputs[0]
+                # Shape is (Batch, 960, 2), so we softmax on dim=-1
+                probs[i:end_idx] = torch.softmax(logits, dim=-1)[:, :, 1].cpu().numpy()
+            else:
+                # It's the SFT ConvLSTM (returns only logits)
+                logits = outputs
+                # Shape is (Batch, 2, 960), so we softmax on dim=1
+                probs[i:end_idx] = torch.softmax(logits, dim=1)[:, 1, :].cpu().numpy()
 
     # 3. Stitching overlaps (640 step, 960 window)
     win_samples = 960
-    step_samples = 640 
+    step_samples = 640
     total_samples = step_samples * (num_segments - 1) + win_samples
 
     full_y = np.zeros(total_samples)
@@ -108,21 +119,36 @@ def evaluate_full_night(model, night_num, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__":
-    # Test your actual files!
-    TEST_NIGHT = 2
-    TEST_TARGET = 'CA'
+    TEST_NIGHT = 1
+    TEST_TARGET = 'OSA'
+    
+    # CHANGE THIS to 'SFT' if you want to test your raw ConvLSTM weights!
+    EVAL_MODE = 'RLHF' 
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # CHANGED: Update input_size to 6 to match the new Core architecture
-    model = ActorCriticLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
-    weights_path = f'rlhf_penta_lstm_{TEST_TARGET}_weights.pth'
-    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
+    if EVAL_MODE == 'RLHF':
+        model = ActorCriticLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
+        weights_path = f'rlhf_penta_lstm_{TEST_TARGET}_weights.pth'
+    else:
+        # Import whatever you named your SFT class here (e.g., ConvLSTM)
+        from train_lstm import ConvLSTM 
+        model = ConvLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
+        weights_path = f'penta_lstm_{TEST_TARGET}_weights.pth'
+
+    print(f"Loading {EVAL_MODE} weights from {weights_path}...")
+    try:
+        model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
+    except RuntimeError as e:
+        print("\n❌ ARCHITECTURE MISMATCH ERROR!")
+        print("Did you try to load old RLHF weights into the new CNN-enabled ActorCriticLSTM?")
+        print("You need to run train_rlhf_ppo.py first to generate the new weights!\n")
+        raise e
     
     print(f"Running Full Night Evaluation for {TEST_TARGET} on Night {TEST_NIGHT}...")
     results = evaluate_full_night(model, TEST_NIGHT, TEST_TARGET, device)
     
-    print("\n--- Event-Based Validation Results ---")
+    print("\n--- RLHF Event-Based Validation Results ---")
     for key, value in results.items():
         if isinstance(value, float):
             print(f"{key}: {value:.4f}")

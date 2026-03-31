@@ -17,8 +17,8 @@ from calculate_clinical_metrics import evaluate_full_night # <-- IMPORTED EVALUA
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TYPE = 'CA'
-NIGHT_TO_TEST = 2
+TARGET_TYPE = 'OSA'
+NIGHT_TO_TEST = 1
 MAX_QUESTIONS_PER_EPOCH = 8
 WARM_UP_EPOCHS = 2 
 INPUT_CHANNELS = 6

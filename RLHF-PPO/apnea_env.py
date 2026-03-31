@@ -2,8 +2,8 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
-NIGHT_TO_TEST = 2
-TARGET_TYPE= 'CA' 
+NIGHT_TO_TEST = 1
+TARGET_TYPE= 'OSA' 
 
 
 class ApneaEnv(gym.Env):
