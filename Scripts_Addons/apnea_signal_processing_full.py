@@ -8,8 +8,15 @@ from sklearn.preprocessing import StandardScaler
 # 1. LOAD & CLEAN DATA (Using Pandas)
 # =============================================================
 print("1. Loading and cleaning full night data...")
-df = pd.read_csv('Data\ON020217-06.csv', 
+
+NO_OF_CHANNELS=7
+NIGHT_TEST=7
+if NO_OF_CHANNELS==6:
+    df = pd.read_csv('Data\ON030217-06.csv', 
                  names=['PFlow', 'Thorax', 'Abdomen', 'SaO2', 'Vitalog1', 'Vitalog2', 'time_sec'])
+else:
+    df = pd.read_csv('Data\TR041016-05.csv', 
+                 names=['PFlow', 'Thorax', 'Abdomen', 'SaO2', 'Vitalog1', 'Vitalog2','ECG', 'time_sec'])
 
 fs_original = 256
 
@@ -191,10 +198,10 @@ print("6. Extracting 5 core channels for AI input...")
 core_indices = [3, 4, 5, 11, 14, 15, 17, 18] 
 
 X_train = normalized_segments[:, :, core_indices]
-np.save('X_train_PentaLSTM.npy', X_train)
+np.save(f'X_{NIGHT_TEST}', X_train)
 
 # We save the segment_times so we can map the doctor's labels perfectly later!
-np.save('segment_times.npy', segment_times)
+np.save(f'segment_times_n{NIGHT_TEST}.npy', segment_times)
 
 print(f"\n✅ SUCCESS! Preprocessing complete.")
 print(f"   X_train saved: {X_train.shape} (Segments, Time-Steps, Channels)")

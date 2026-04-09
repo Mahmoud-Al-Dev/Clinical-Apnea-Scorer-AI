@@ -4,8 +4,9 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data\ST300317-06.TXT'  
-SEGMENT_TIMES_PATH = 'segment_times_n3.npy'
+TXT_FILE_PATH = 'Data\TR041016-05.TXT'  
+TEST_NIGHT=7
+SEGMENT_TIMES_PATH = f'Nights/segment_times_n{TEST_NIGHT}.npy'
 # ==========================================
 
 print("1. Loading saved segment timeline...")
@@ -92,8 +93,8 @@ for i in range(num_segments):
             Y_labels_OSA[i, overlap_mask, 0] = 1 # Mark 1 for OSA
 
 print("4. Saving Y_train_Labels_CA.npy and Y_train_Labels_OSA.npy...")
-np.save('Y_train_Labels_CA.npy', Y_labels_CA)
-np.save('Y_train_Labels_OSA.npy', Y_labels_OSA)
+np.save(f'Y_CA_{TEST_NIGHT}.npy', Y_labels_CA)
+np.save(f'Y_OSA_{TEST_NIGHT}.npy', Y_labels_OSA)
 
 # Print a quick summary to prove it worked
 print(f"✅ SUCCESS!")

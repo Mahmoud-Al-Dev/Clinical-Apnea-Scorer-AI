@@ -61,8 +61,8 @@ def evaluate_full_night(model, night_num, target_type, device):
     model.eval()
     
     # 1. Load Data
-    X = np.load(f'X_{night_num}.npy')
-    Y_true = np.load(f'Y_{target_type}_{night_num}.npy')
+    X = np.load(f'Nights/X_{night_num}.npy')
+    Y_true = np.load(f'Nights/Y_{target_type}_{night_num}.npy')
     
     # The 6 AI indices to slice the array
     ai_indices = [0, 3, 4, 5, 6, 7]
@@ -113,12 +113,11 @@ def evaluate_full_night(model, night_num, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__":
-    TEST_NIGHT = 1
-    TEST_TARGET = 'OSA'  # Change to 'OSA' as needed
+    TEST_NIGHT = 7
+    TEST_TARGET = 'OSA'  
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    # CHANGED: Instantiate the ConvLSTM SFT model
     model = ConvLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
     
     # CHANGED: Point to the SFT weights, not the RLHF weights
