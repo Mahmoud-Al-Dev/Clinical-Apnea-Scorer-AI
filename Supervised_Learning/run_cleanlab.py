@@ -9,9 +9,9 @@ from train_lstm import ConvLSTM
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'OSA'    
+TARGET_TYPE = 'CA'    
 CLEAN_TEACHER_WEIGHTS = f'penta_lstm_{TARGET_TYPE}_weights.pth' 
-NOISY_NIGHT_ID = 6
+NOISY_NIGHT_ID = 8
 # ==========================================
 
 def run_cleanlab():

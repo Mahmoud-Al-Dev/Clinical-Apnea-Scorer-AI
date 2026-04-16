@@ -12,9 +12,9 @@ import mlflow
 TARGET_TYPE = 'OSA' 
 
 # 1. Dataset Splits
-TRAIN_NIGHTS = [1, 2, 3, 4, 5, 6] 
+TRAIN_NIGHTS = [1, 2,3, 4, 5, 6, 7] 
 VAL_NIGHT = 3          # Only used if USE_VALIDATION is True
-TEST_NIGHTS = [ 1, 2, 3, 4, 5, 6]   # Nights to evaluate automatically after training
+TEST_NIGHTS = [2,3]   # Nights to evaluate automatically after training
 
 # 2. Training Settings
 USE_VALIDATION = False 
@@ -24,7 +24,7 @@ LEARNING_RATE = 0.001
 
 # 3. PU Learning & Loss Weights
 CLASS_WEIGHT_NORMAL = 1.0
-CLASS_WEIGHT_APNEA = 2.0
+CLASS_WEIGHT_APNEA = 4.0
 PU_DISCOUNT = 0.40
 # =================================================================
 

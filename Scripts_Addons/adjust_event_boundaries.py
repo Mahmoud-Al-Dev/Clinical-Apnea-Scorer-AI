@@ -5,13 +5,21 @@ import os
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'CA'    
-NIGHT_ID = 6
-SAMPLING_RATE = 32 # Assuming 32Hz based on standard 960-sample 30s windows
+TARGET_TYPE = 'OSA'    # Change to 'CA' when needed
+NIGHT_ID = 8
+SAMPLING_RATE = 32 
 
-# The file you want to load and fix:
-INPUT_LABELS_PATH = f'Nights\Y_{TARGET_TYPE}_{NIGHT_ID}.npy'
-# We save to a new file so we don't accidentally destroy your previous work
+# 1. SMART LOADING: Try Silver first, fallback to Raw
+silver_path = f'Nights\Y_{TARGET_TYPE}_{NIGHT_ID}_SILVER.npy'
+raw_path = f'Nights\Y_{TARGET_TYPE}_{NIGHT_ID}.npy'
+
+if os.path.exists(silver_path):
+    print(f"📂 Found SILVER standard. Loading all AI discoveries...")
+    INPUT_LABELS_PATH = silver_path
+else:
+    print(f"⚠️ No SILVER standard found. Falling back to original labels...")
+    INPUT_LABELS_PATH = raw_path
+    
 OUTPUT_LABELS_PATH = f'Nights\Y_{TARGET_TYPE}_{NIGHT_ID}_ADJUSTED.npy'
 # ==========================================
 
@@ -22,14 +30,12 @@ def adjust_stitched_boundaries():
         print(f"ERROR: Cannot find {INPUT_LABELS_PATH}.")
         return
 
-    # 1. Load the Data
     X = np.load(f'Nights\X_{NIGHT_ID}.npy')
     Y_current = np.load(INPUT_LABELS_PATH)
     segment_times = np.load(f'Nights\segment_times_n{NIGHT_ID}.npy')
     
-    human_indices = [0, 1, 2, 5] # PFlow, Thorax, Abdomen, SaO2
+    human_indices = [0, 1, 2, 5] 
     
-    # 2. Stitch Y into a continuous timeline to eliminate overlaps
     min_time = segment_times[0, 0]
     max_time = segment_times[-1, -1]
     total_samples = int(np.ceil((max_time - min_time) * SAMPLING_RATE)) + 1
@@ -39,10 +45,8 @@ def adjust_stitched_boundaries():
     for i in range(len(Y_current)):
         start_idx = int(round((segment_times[i, 0] - min_time) * SAMPLING_RATE))
         end_idx = start_idx + len(Y_current[i])
-        # Logical OR merges the overlaps perfectly
         continuous_Y[start_idx:end_idx] |= Y_current[i].flatten()
 
-    # 3. Extract unique events from the continuous timeline
     padded = np.pad(continuous_Y, (1, 1), 'constant')
     diffs = np.diff(padded)
     starts = np.where(diffs == 1)[0]
@@ -56,19 +60,17 @@ def adjust_stitched_boundaries():
         })
 
     total_events = len(unique_events)
-    print(f"Found {total_events} UNIQUE {TARGET_TYPE} events after merging overlaps. Starting review...")
+    print(f"Found {total_events} UNIQUE {TARGET_TYPE} events. Starting review...")
 
-    # We will build a brand new continuous array based ONLY on your manual confirmations
-    continuous_Y_edited = np.zeros_like(continuous_Y)
+    # --- BUG FIX: Start with a perfect clone so 'q' doesn't delete data ---
+    continuous_Y_edited = np.copy(continuous_Y)
 
-    # 4. UI Loop - Iterating over EVENTS, not segments
     for idx, event in enumerate(unique_events):
         current_start = event['start_time']
         current_end = event['end_time']
         mid_time = (current_start + current_end) / 2.0
         
-        # Find the single best segment to display this event (the one whose center is closest to the event)
-        seg_mid_times = segment_times[:, 480] # Index 480 is the middle of the 960-sample window
+        seg_mid_times = segment_times[:, 480] 
         best_seg_idx = np.argmin(np.abs(seg_mid_times - mid_time))
         
         time_axis = segment_times[best_seg_idx]
@@ -76,11 +78,9 @@ def adjust_stitched_boundaries():
         vis_signals = current_x[:, human_indices] 
         ratio_signal = current_x[:, 6] 
 
-        # Plotting
         fig, axes = plt.subplots(5, 1, figsize=(14, 12), sharex=True)
         plot_color = 'red' if TARGET_TYPE == 'CA' else 'orange'
         
-        # We create a local mask just for plotting the current bounds
         plot_mask = (time_axis >= current_start) & (time_axis <= current_end)
         
         axes[0].plot(time_axis, vis_signals[:, 0], color='blue', alpha=0.7)
@@ -115,12 +115,14 @@ def adjust_stitched_boundaries():
         plt.close(fig) 
         
         if user_input == 'q':
-            print("Quitting early. Any confirmed changes up to this point will be saved.")
+            print("Quitting early. All unreviewed events will be kept exactly as they are.")
             break
             
         elif user_input == 'd':
             print("--> Event deleted.")
-            # Do nothing to continuous_Y_edited, leaving it as 0s
+            s_idx = int(round((current_start - min_time) * SAMPLING_RATE))
+            e_idx = int(round((current_end - min_time) * SAMPLING_RATE))
+            continuous_Y_edited[s_idx:e_idx] = 0 # Actively erase it
             
         elif user_input == 'm':
             try:
@@ -130,25 +132,22 @@ def adjust_stitched_boundaries():
                 final_start = float(t_start_input) if t_start_input else current_start
                 final_end = float(t_end_input) if t_end_input else current_end
                 
-                # Apply new boundaries to the master continuous array
-                s_idx = int(round((final_start - min_time) * SAMPLING_RATE))
-                e_idx = int(round((final_end - min_time) * SAMPLING_RATE))
-                continuous_Y_edited[s_idx:e_idx] = 1
+                # Erase old boundaries first
+                s_idx_old = int(round((current_start - min_time) * SAMPLING_RATE))
+                e_idx_old = int(round((current_end - min_time) * SAMPLING_RATE))
+                continuous_Y_edited[s_idx_old:e_idx_old] = 0
+                
+                # Apply new boundaries
+                s_idx_new = int(round((final_start - min_time) * SAMPLING_RATE))
+                e_idx_new = int(round((final_end - min_time) * SAMPLING_RATE))
+                continuous_Y_edited[s_idx_new:e_idx_new] = 1
                 
                 print(f"--> Saved adjusted bounds: {final_start}s - {final_end}s.")
             except ValueError:
-                print("Invalid input. Reverting to original boundaries.")
-                s_idx = int(round((current_start - min_time) * SAMPLING_RATE))
-                e_idx = int(round((current_end - min_time) * SAMPLING_RATE))
-                continuous_Y_edited[s_idx:e_idx] = 1
-                
+                print("Invalid input. Event kept as is.")
         else:
             print("--> Event kept as is.")
-            s_idx = int(round((current_start - min_time) * SAMPLING_RATE))
-            e_idx = int(round((current_end - min_time) * SAMPLING_RATE))
-            continuous_Y_edited[s_idx:e_idx] = 1
 
-    # 5. Slice the continuous array back into overlapping segments
     print("\nRe-segmenting data into original overlapping format...")
     Y_adjusted = np.zeros_like(Y_current)
     
@@ -156,13 +155,11 @@ def adjust_stitched_boundaries():
         start_idx = int(round((segment_times[i, 0] - min_time) * SAMPLING_RATE))
         end_idx = start_idx + len(Y_current[i])
         
-        # Ensure we don't go out of bounds
         end_idx = min(end_idx, len(continuous_Y_edited))
         segment_data = continuous_Y_edited[start_idx:end_idx]
         
         Y_adjusted[i, :len(segment_data)] = segment_data.reshape(-1, 1)
 
-    # 6. Save the final file
     np.save(OUTPUT_LABELS_PATH, Y_adjusted)
     print(f"[SUCCESS] Adjusted overlapping labels saved to {OUTPUT_LABELS_PATH}!")
 

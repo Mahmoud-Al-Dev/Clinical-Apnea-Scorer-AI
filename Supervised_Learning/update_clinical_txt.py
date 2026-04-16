@@ -4,40 +4,38 @@ import os
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'OSA'
-NIGHT_ID = 6
+TARGET_TYPES = ['OSA', 'CA'] 
+NIGHT_ID = 8
 SAMPLING_RATE = 32 # 32 Hz
 
-cleaned_segments_path = f'Nights/Y_{TARGET_TYPE}_{NIGHT_ID}_SILVER.npy'
-original_segments_path = f'Nights/Y_{TARGET_TYPE}_{NIGHT_ID}.npy'
 segment_times_path = f'Nights/segment_times_n{NIGHT_ID}.npy'
+original_txt_path = r'Data/UI220916-06.TXT' 
+output_txt_path = f'UI220916-06_MASTER_SILVER_CLEANED.TXT'
+# ==========================================
 
-original_txt_path = r'Data\ST310317-06.TXT' 
-output_txt_path = f'ST310317-06_{TARGET_TYPE}_CLEANED.TXT'
+def process_target_data(target_type, segment_times, min_time, total_samples):
+    cleaned_path = f'Nights/Y_{target_type}_{NIGHT_ID}_SILVER.npy'
+    orig_path = f'Nights/Y_{target_type}_{NIGHT_ID}.npy'
+    
+    if not os.path.exists(cleaned_path) or not os.path.exists(orig_path):
+        print(f"  ⚠️ Warning: Missing SILVER or Original files for {target_type}. Skipping this type.")
+        return [], None
 
-def generate_cleaned_clinical_report():
-    print(f"--- Chronologically Integrating AI Discoveries for Night {NIGHT_ID} ---")
+    print(f"  -> Processing {target_type} data...")
+    Y_clean = np.load(cleaned_path)
+    Y_orig = np.load(orig_path)
     
-    Y_clean = np.load(cleaned_segments_path)
-    Y_orig = np.load(original_segments_path)
-    segment_times = np.load(segment_times_path)
-    
-    min_time = segment_times[0, 0]
-    max_time = segment_times[-1, -1]
-    total_samples = int(np.ceil((max_time - min_time) * SAMPLING_RATE)) + 1
-    
-    # 1. Build the full continuous timeline of your SILVER standard
-    # We will use this to verify if the doctor's original events survived your review
-    continuous_clean_labels = np.zeros(total_samples, dtype=int)
+    # 1. Build continuous timeline of SILVER standard (to verify doctor labels)
+    continuous_clean = np.zeros(total_samples, dtype=int)
     for i in range(len(Y_clean)):
         seg_times = segment_times[i]
         seg_labels = Y_clean[i].flatten()
         start_idx = int(round((seg_times[0] - min_time) * SAMPLING_RATE))
         end_idx = start_idx + len(seg_labels)
         end_idx = min(end_idx, total_samples)
-        continuous_clean_labels[start_idx:end_idx] |= seg_labels[:end_idx-start_idx]
+        continuous_clean[start_idx:end_idx] |= seg_labels[:end_idx-start_idx]
 
-    # 2. Isolate ONLY the new events the AI added (to append them)
+    # 2. Isolate ONLY the new events the AI added
     Y_ai_only = np.clip(Y_clean - Y_orig, 0, 1)
     continuous_ai_added = np.zeros(total_samples, dtype=int)
     
@@ -54,18 +52,38 @@ def generate_cleaned_clinical_report():
     starts = np.where(diffs == 1)[0]
     ends = np.where(diffs == -1)[0]
     
-    # Store NEW AI events as dictionaries
     ai_events = []
     for s, e in zip(starts, ends):
         ai_events.append({
             'start': min_time + (s / SAMPLING_RATE),
             'duration': (e - s) / SAMPLING_RATE,
-            'type': f'{TARGET_TYPE}' # Tag them so they stand out!
+            'type': target_type
         })
+        
+    print(f"     Found {len(ai_events)} new AI discoveries for {target_type}.")
+    return ai_events, continuous_clean
 
-    print(f"Found {len(ai_events)} BRAND NEW AI events to weave into the timeline.")
+def generate_master_clinical_report():
+    print(f"--- Chronologically Integrating AI Discoveries for Night {NIGHT_ID} ---")
+    
+    segment_times = np.load(segment_times_path)
+    min_time = segment_times[0, 0]
+    max_time = segment_times[-1, -1]
+    total_samples = int(np.ceil((max_time - min_time) * SAMPLING_RATE)) + 1
+    
+    all_ai_events = []
+    clean_timelines = {}
+    
+    # Process both OSA and CA arrays
+    for t_type in TARGET_TYPES:
+        events, timeline = process_target_data(t_type, segment_times, min_time, total_samples)
+        if timeline is not None:
+            all_ai_events.extend(events)
+            clean_timelines[t_type] = timeline
 
-    # 3. Parse the original file and FILTER OUT deleted doctor events
+    print(f"\nTotal BRAND NEW AI events to weave into the timeline: {len(all_ai_events)}")
+
+    # Parse the original file and FILTER OUT deleted doctor events
     with open(original_txt_path, 'r', encoding='latin-1') as file:
         lines = file.readlines()
 
@@ -73,7 +91,7 @@ def generate_cleaned_clinical_report():
     state = 'PRE_TABLE'
     header_line_idx = -1
     parsed_original_events = []
-    deleted_doctor_events = 0
+    deleted_doctor_events = {t_type: 0 for t_type in TARGET_TYPES}
 
     for line in lines:
         if state == 'PRE_TABLE':
@@ -93,7 +111,7 @@ def generate_cleaned_clinical_report():
             if line.strip() == "" or "Sighs" in line or "Body Position" in line:
                 
                 # --- THE MAGIC CHRONOLOGICAL WEAVE ---
-                all_events = parsed_original_events + ai_events
+                all_events = parsed_original_events + all_ai_events
                 all_events.sort(key=lambda x: x['start']) # Sort everything chronologically!
                 
                 out_lines[header_line_idx] = f"Respiratory/Apnea/Hypopnea ({len(all_events)} Ereignisse)\n"
@@ -130,18 +148,18 @@ def generate_cleaned_clinical_report():
                         
                         keep_event = True
                         
-                        # --- NEW: VERIFY DOCTOR'S LABEL SURVIVED YOUR REVIEW ---
-                        if event_type == TARGET_TYPE:
+                        # --- VERIFY DOCTOR'S LABEL SURVIVED YOUR REVIEW ---
+                        if event_type in clean_timelines:
                             start_idx = int(round((start_time - min_time) * SAMPLING_RATE))
                             end_idx = int(round((start_time + duration - min_time) * SAMPLING_RATE))
+                            timeline = clean_timelines[event_type]
                             
-                            if 0 <= start_idx < len(continuous_clean_labels):
-                                end_idx = min(end_idx, len(continuous_clean_labels))
-                                # If there are ZERO '1s' in this window in your Silver file,
-                                # it means you rejected the doctor's event and deleted it!
-                                if np.sum(continuous_clean_labels[start_idx:end_idx]) == 0:
+                            if 0 <= start_idx < len(timeline):
+                                end_idx = min(end_idx, len(timeline))
+                                # If there are ZERO '1s' in this window, you deleted it!
+                                if np.sum(timeline[start_idx:end_idx]) == 0:
                                     keep_event = False
-                                    deleted_doctor_events += 1
+                                    deleted_doctor_events[event_type] += 1
                         
                         if keep_event:
                             parsed_original_events.append({
@@ -158,8 +176,11 @@ def generate_cleaned_clinical_report():
     with open(output_txt_path, 'w', encoding='latin-1') as out_file:
         out_file.writelines(out_lines)
 
-    print(f"Purged {deleted_doctor_events} incorrect doctor labels (False Alarms).")
-    print(f"✅ SUCCESS! Woven timeline saved to: {output_txt_path}")
+    print("\n--- Summary of Deleted Doctor False Alarms ---")
+    for t_type, count in deleted_doctor_events.items():
+        print(f"Purged {count} incorrect {t_type} labels.")
+        
+    print(f"\n✅ SUCCESS! Master timeline saved to: {output_txt_path}")
 
 if __name__ == "__main__":
-    generate_cleaned_clinical_report()
+    generate_master_clinical_report()
