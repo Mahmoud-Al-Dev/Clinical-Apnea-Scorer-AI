@@ -5,14 +5,14 @@ import os
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'OSA'    
-NIGHT_ID = 1      
+TARGET_TYPE = 'CA'    
+NIGHT_ID = 6
 SAMPLING_RATE = 32 # Assuming 32Hz based on standard 960-sample 30s windows
 
 # The file you want to load and fix:
-INPUT_LABELS_PATH = f'Y_{TARGET_TYPE}_{NIGHT_ID}.npy'
+INPUT_LABELS_PATH = f'Nights\Y_{TARGET_TYPE}_{NIGHT_ID}.npy'
 # We save to a new file so we don't accidentally destroy your previous work
-OUTPUT_LABELS_PATH = f'Y_{TARGET_TYPE}_{NIGHT_ID}_ADJUSTED.npy'
+OUTPUT_LABELS_PATH = f'Nights\Y_{TARGET_TYPE}_{NIGHT_ID}_ADJUSTED.npy'
 # ==========================================
 
 def adjust_stitched_boundaries():
@@ -23,9 +23,9 @@ def adjust_stitched_boundaries():
         return
 
     # 1. Load the Data
-    X = np.load(f'X_{NIGHT_ID}.npy')
+    X = np.load(f'Nights\X_{NIGHT_ID}.npy')
     Y_current = np.load(INPUT_LABELS_PATH)
-    segment_times = np.load(f'segment_times_n{NIGHT_ID}.npy')
+    segment_times = np.load(f'Nights\segment_times_n{NIGHT_ID}.npy')
     
     human_indices = [0, 1, 2, 5] # PFlow, Thorax, Abdomen, SaO2
     

@@ -2,7 +2,6 @@ import torch
 import numpy as np
 from scipy.ndimage import label
 
-# CHANGED: Import your SFT model instead of the RLHF model
 from train_lstm import ConvLSTM 
 
 def apply_cleanup_filter(predictions, min_length_frames=320):
@@ -113,8 +112,8 @@ def evaluate_full_night(model, night_num, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__":
-    TEST_NIGHT = 7
-    TEST_TARGET = 'OSA'  
+    TEST_NIGHT = 6
+    TEST_TARGET = 'CA'  
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
