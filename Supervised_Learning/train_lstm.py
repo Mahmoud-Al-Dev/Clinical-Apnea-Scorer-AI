@@ -12,13 +12,13 @@ import mlflow
 TARGET_TYPE = 'OSA' 
 
 # 1. Dataset Splits
-TRAIN_NIGHTS = [1, 2,3, 4, 5, 6, 7] 
-VAL_NIGHT = 3          # Only used if USE_VALIDATION is True
-TEST_NIGHTS = [2,3]   # Nights to evaluate automatically after training
+TRAIN_NIGHTS = [1, 2, 4, 5, 6, 7, 8] 
+VAL_NIGHTS = [3, 9]        # Only used if USE_VALIDATION is True
+TEST_NIGHTS = [3,9]   # Nights to evaluate automatically after training
 
 # 2. Training Settings
-USE_VALIDATION = False 
-MAX_EPOCHS = 30
+USE_VALIDATION = True 
+MAX_EPOCHS = 50
 PATIENCE = 20          
 LEARNING_RATE = 0.001
 
@@ -110,7 +110,7 @@ def train_model():
             "train_nights": str(TRAIN_NIGHTS),
             "test_nights": str(TEST_NIGHTS),
             "use_validation": USE_VALIDATION,
-            "val_night": VAL_NIGHT if USE_VALIDATION else "None",
+            "val_night": VAL_NIGHTS if USE_VALIDATION else "None",
             "max_epochs": MAX_EPOCHS,
             "patience": PATIENCE,
             "learning_rate": LEARNING_RATE,
@@ -128,7 +128,7 @@ def train_model():
         
         if USE_VALIDATION:
             print("\n--- Preparing Validation Set ---")
-            val_dataset = MultiNightApneaDataset([VAL_NIGHT], TARGET_TYPE)
+            val_dataset = MultiNightApneaDataset(VAL_NIGHTS, TARGET_TYPE) 
             val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
         else:
             print("\n--- Validation/Early Stopping is DISABLED ---")
