@@ -10,13 +10,17 @@ from sklearn.preprocessing import StandardScaler
 print("1. Loading and cleaning full night data...")
 
 NO_OF_CHANNELS=7
-NIGHT_TEST=9
+NIGHT_TEST=13
 if NO_OF_CHANNELS==6:
     df = pd.read_csv('Data\ON030217-06.csv', 
                  names=['PFlow', 'Thorax', 'Abdomen', 'SaO2', 'Vitalog1', 'Vitalog2', 'time_sec'])
-else:
-    df = pd.read_csv('Data/9MG080916-07.csv', 
+elif NO_OF_CHANNELS== 7:
+    df = pd.read_csv('Data/DKB041216-06.csv', 
                  names=['PFlow', 'Thorax', 'Abdomen', 'SaO2', 'Vitalog1', 'Vitalog2','ECG', 'time_sec'])
+else:
+    df = pd.read_csv('Data/ASK051016-08.csv', 
+                 names=['PFlow', 'Thorax', 'Abdomen', 'SaO2', 'ECG', 'time_sec'])
+
 
 fs_original = 256
 
@@ -50,8 +54,8 @@ print("2. Extracting and Engineering features at 256 Hz...")
 data['PFlow_Detrend'] = detrend(data['PFlow'])
 data['Thorax_Detrend'] = detrend(data['Thorax'])
 data['Abdomen_Detrend'] = detrend(data['Abdomen'])
-data['Vitalog1_Med'] = median_filter(data['Vitalog1'], size=fs_original)
-data['Vitalog2_Med'] = median_filter(data['Vitalog2'], size=fs_original)
+#data['Vitalog1_Med'] = median_filter(data['Vitalog1'], size=fs_original)
+#data['Vitalog2_Med'] = median_filter(data['Vitalog2'], size=fs_original)
 
 # 2. Gentle Low-Pass Filter to remove the high-frequency fuzz (Cutoff at 2.0 Hz)
 def apply_lowpass(signal, cutoff, fs, order=2):
@@ -59,8 +63,8 @@ def apply_lowpass(signal, cutoff, fs, order=2):
     b, a = butter(order, cutoff/nyq, btype='low')
     return filtfilt(b, a, signal)
 
-data['Vitalog1_Clean'] = apply_lowpass(data['Vitalog1_Med'], 2.0, fs_original)
-data['Vitalog2_Clean'] = apply_lowpass(data['Vitalog2_Med'], 2.0, fs_original)
+#data['Vitalog1_Clean'] = apply_lowpass(data['Vitalog1_Med'], 2.0, fs_original)
+#data['Vitalog2_Clean'] = apply_lowpass(data['Vitalog2_Med'], 2.0, fs_original)
 
 # B. SaO2 Smoothing
 data['SaO2_Smooth'] = uniform_filter1d(data['SaO2'], size=512)
@@ -117,8 +121,8 @@ feature_columns = [
     'Thorax_Upper', 'Thorax_Lower', 'Thorax_Width',     # 9, 10, 11
     'Abdomen_Upper', 'Abdomen_Lower', 'Abdomen_Width',  # 12, 13, 14
     'SaO2_Smooth', 'Thorax_Abdomen_Corr', 'Effort_Flow_Ratio', # 15, 16, 17
-    'SaO2_Deriv', 'Phase_Angle', 'PFlow_Var',            # 18, 19, 20
-    'Vitalog1_Clean','Vitalog2_Clean'                   # 21, 22 
+    'SaO2_Deriv', 'Phase_Angle', 'PFlow_Var'            # 18, 19, 20
+    #'Vitalog1_Clean','Vitalog2_Clean'                   # 21, 22 
 ]
 
 features_256hz = data[feature_columns].values

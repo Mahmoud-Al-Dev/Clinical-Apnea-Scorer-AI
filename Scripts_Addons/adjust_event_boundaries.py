@@ -6,7 +6,7 @@ import os
 # --- CONFIGURATION ---
 # ==========================================
 TARGET_TYPE = 'OSA'    # Change to 'CA' when needed
-NIGHT_ID = 9
+NIGHT_ID = 13
 SAMPLING_RATE = 32 
 
 # 1. SMART LOADING: Try Silver first, fallback to Raw
