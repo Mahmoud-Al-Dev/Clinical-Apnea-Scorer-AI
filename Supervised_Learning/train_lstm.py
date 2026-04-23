@@ -12,13 +12,13 @@ import mlflow
 TARGET_TYPE = 'CA' 
 
 # 1. Dataset Splits
-TRAIN_NIGHTS = [1, 2, 4, 5, 6, 7,9,10] 
+TRAIN_NIGHTS = [1, 2, 3,4,5, 6, 7,8,9,10,11,12,13] 
 VAL_NIGHTS = [3, 9]        # Only used if USE_VALIDATION is True
 TEST_NIGHTS = [3,9]   # Nights to evaluate automatically after training
 
 # 2. Training Settings
 USE_VALIDATION = False 
-MAX_EPOCHS = 30
+MAX_EPOCHS = 25
 PATIENCE = 20          
 LEARNING_RATE = 0.001
 

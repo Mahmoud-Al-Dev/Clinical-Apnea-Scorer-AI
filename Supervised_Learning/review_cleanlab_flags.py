@@ -8,8 +8,8 @@ from train_lstm import ConvLSTM
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TYPE = 'CA'  
-NIGHT_TO_TEST = 10
+TARGET_TYPE = 'OSA'  
+NIGHT_TO_TEST = 11
 
 # Review Selection Controls
 REVIEW_ALL = True             # Set to True to review EVERY flag Cleanlab found

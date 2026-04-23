@@ -155,7 +155,7 @@ def run_multi_night_evaluation(model, test_nights, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__":
-    TEST_NIGHTS = [11,12,13]  
+    TEST_NIGHTS = [14,15,16,17,18,19]  
     TEST_TARGET = 'OSA'  
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
