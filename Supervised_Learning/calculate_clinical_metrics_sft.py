@@ -155,13 +155,15 @@ def run_multi_night_evaluation(model, test_nights, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__":
-    TEST_NIGHTS = [14,15,16,17,18,19]  
+    TEST_NIGHTS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19]  
     TEST_TARGET = 'OSA'  
-    
+    MODEL_TYPE= 'DPO'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ConvLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
-    
-    weights_path = f'penta_lstm_{TEST_TARGET}_weights.pth'
+    if MODEL_TYPE=='SFT':
+        weights_path = f'penta_lstm_{TEST_TARGET}_weights.pth'
+    else:
+        weights_path = f'penta_lstm_{TEST_TARGET}_{MODEL_TYPE}_weights.pth'
     
     try:
         model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))

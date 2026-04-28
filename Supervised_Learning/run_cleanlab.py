@@ -10,8 +10,12 @@ from train_lstm import ConvLSTM
 # --- CONFIGURATION ---
 # ==========================================
 TARGET_TYPE = 'CA'    
-CLEAN_TEACHER_WEIGHTS = f'penta_lstm_{TARGET_TYPE}_weights.pth' 
-NOISY_NIGHT_ID = 11
+MODEL_TYPE = 'SFT'
+if MODEL_TYPE == 'SFT':
+    CLEAN_TEACHER_WEIGHTS = f'penta_lstm_{TARGET_TYPE}_weights.pth' 
+else:
+    CLEAN_TEACHER_WEIGHTS = f'penta_lstm_{TARGET_TYPE}_{MODEL_TYPE}_weights.pth'
+NOISY_NIGHT_ID = 19
 # ==========================================
 
 def run_cleanlab():
