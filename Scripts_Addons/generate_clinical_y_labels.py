@@ -4,8 +4,8 @@ import os
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TXT_FILE_PATH = 'Data/KAB090417-05.TXT'  
-TEST_NIGHT=20
+TXT_FILE_PATH = 'Data/ISK041016-06.TXT'  
+TEST_NIGHT=18
 SEGMENT_TIMES_PATH = f'Nights/segment_times_n{TEST_NIGHT}.npy'
 # ==========================================
 

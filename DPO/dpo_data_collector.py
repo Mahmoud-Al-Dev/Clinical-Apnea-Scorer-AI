@@ -22,8 +22,8 @@ except ImportError as e:
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-NIGHT_ID = 12           # Pick an UNCLEANED night for the PoC
-TARGET_TYPE = 'OSA'    
+NIGHT_ID = 2
+TARGET_TYPE = 'CA'    
 SAMPLING_RATE = 32
 MAX_PAIRS = 150        
 

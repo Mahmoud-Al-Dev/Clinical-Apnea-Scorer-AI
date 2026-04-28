@@ -9,12 +9,12 @@ from train_lstm import ConvLSTM
 # --- USER CONTROLS ---
 # ==========================================
 TARGET_TYPE = 'CA'  
-NIGHT_TO_TEST = 19
+NIGHT_TO_TEST = 10
 
 # Review Selection Controls
 REVIEW_ALL = True             # Set to True to review EVERY flag Cleanlab found
-REVIEW_TOP_CONFIDENT = 100        # "Arrogant AI Mistakes" (High Confidence)
-REVIEW_BOTTOM_UNCERTAIN = 20     # "Confused Edge Cases" (Low Confidence / ~50%)
+REVIEW_TOP_CONFIDENT = 119        # "Arrogant AI Mistakes" (High Confidence)
+REVIEW_BOTTOM_UNCERTAIN = 0     # "Confused Edge Cases" (Low Confidence / ~50%)
 # =========================================y=n
 
 print(f"--- Launching Interactive Cleanlab Reviewer for Night {NIGHT_TO_TEST} ({TARGET_TYPE}) ---")
