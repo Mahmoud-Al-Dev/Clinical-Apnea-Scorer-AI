@@ -22,8 +22,8 @@ except ImportError as e:
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-NIGHT_ID = 2
-TARGET_TYPE = 'CA'    
+NIGHT_ID = 7
+TARGET_TYPE = 'OSA'    
 SAMPLING_RATE = 32
 MAX_PAIRS = 150        
 

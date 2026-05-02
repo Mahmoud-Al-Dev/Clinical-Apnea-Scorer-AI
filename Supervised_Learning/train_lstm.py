@@ -9,16 +9,16 @@ import mlflow
 # =================================================================
 # --- USER CONTROLS ---
 # =================================================================
-TARGET_TYPE = 'CA' 
+TARGET_TYPE = 'OSA' 
 
 # 1. Dataset Splits
-#TRAIN_NIGHTS = [1,2,3,6,8,10,12,13,14,15,16,17,18,19] 
-#VAL_NIGHTS = [4, 7]        # Only used if USE_VALIDATION is True
-#TEST_NIGHTS = [5,9,11]   # Nights to evaluate automatically after training
+TRAIN_NIGHTS = [1,2,3,5,6,8,9,10,11,12,13,14,15,16,17,18,19,20] 
+VAL_NIGHTS = [4, 7]        # Only used if USE_VALIDATION is True
+TEST_NIGHTS = []   # Nights to evaluate automatically after training
 
-TRAIN_NIGHTS = [1,2,5,6,7,9,10,11,12,13,15,17] 
-VAL_NIGHTS = [18]        # Only used if USE_VALIDATION is True
-TEST_NIGHTS = [4,12]   # Nights to evaluate automatically after training
+#TRAIN_NIGHTS = [1,2,5,6,7,9,10,11,12,13,15,17] 
+#VAL_NIGHTS = [18]        # Only used if USE_VALIDATION is True
+#TEST_NIGHTS = [4,12]   # Nights to evaluate automatically after training
 # 2. Training Settings
 USE_VALIDATION = True 
 MAX_EPOCHS = 50

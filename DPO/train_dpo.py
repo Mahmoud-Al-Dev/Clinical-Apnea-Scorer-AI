@@ -26,7 +26,8 @@ TARGET_TYPE = 'OSA'
 
 PREF_DATA_PATHS = [
     f'dpo_automined_{TARGET_TYPE}_pairs.npy',
-]
+    f'dpo_preferences_n12.npy'
+    ]
 
 SFT_WEIGHTS_PATH = os.path.join(parent_dir, f'penta_lstm_{TARGET_TYPE}_weights.pth')
 DPO_WEIGHTS_PATH = os.path.join(parent_dir, f'penta_lstm_{TARGET_TYPE}_DPO_weights.pth')

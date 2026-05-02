@@ -8,12 +8,12 @@ from train_lstm import ConvLSTM
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TYPE = 'CA'  
-NIGHT_TO_TEST = 10
+TARGET_TYPE = 'OSA'  
+NIGHT_TO_TEST = 12
 
 # Review Selection Controls
 REVIEW_ALL = True             # Set to True to review EVERY flag Cleanlab found
-REVIEW_TOP_CONFIDENT = 119        # "Arrogant AI Mistakes" (High Confidence)
+REVIEW_TOP_CONFIDENT = 80        # "Arrogant AI Mistakes" (High Confidence)
 REVIEW_BOTTOM_UNCERTAIN = 0     # "Confused Edge Cases" (Low Confidence / ~50%)
 # =========================================y=n
 
@@ -133,24 +133,63 @@ for i, seg_idx in enumerate(indices_to_review):
     
     # --- INTERACTIVE MENU ---
     print("Options:")
-    print("  [y] Accept AI's Red Label (Overwrites Doctor)")
+    print("  [y] Accept AI's Red Label (Exactly as is)")
+    print("  [c] Custom Edit (Click START and END points directly on the graph)")
     print("  [n] Reject AI (Keeps Doctor's original label)")
     print("  [r] Add to RLHF Queue (For ambiguous cases)")
     print("  [q] Save & Quit")
-    user_input = input("Choice: ").strip().lower()
-    plt.close(fig)
     
-    if user_input == 'y':
+    user_input = input("Choice: ").strip().lower()
+    
+    # NOTE: We DO NOT close the plot yet, because we might need it for clicks!
+    
+    if user_input == 'c':
+        print("🖱️  Waiting for clicks... Please click 2 points on the graph (Start and End of the event).")
+        try:
+            # ginput(2) waits for exactly 2 mouse clicks on the active Matplotlib window
+            clicks = plt.ginput(2, timeout=-1) 
+            
+            if len(clicks) == 2:
+                # Extract the X coordinates (Time in seconds) from the clicks
+                x1, _ = clicks[0]
+                x2, _ = clicks[1]
+                start_time, end_time = min(x1, x2), max(x1, x2)
+                
+                # Convert clicked seconds back into 960-frame indices
+                start_idx = np.argmin(np.abs(time_axis - start_time))
+                end_idx = np.argmin(np.abs(time_axis - end_time))
+                
+                # Create the custom binary mask
+                custom_mask = np.zeros(960, dtype=int)
+                custom_mask[start_idx:end_idx] = 1
+                
+                Y_working[seg_idx] = custom_mask.reshape(960, 1)
+                print(f"  ✅ Custom event saved from {start_time:.1f}s to {end_time:.1f}s.")
+                corrections_made += 1
+            else:
+                print("  ⚠️ Not enough clicks detected. Keeping original doctor label.")
+        except Exception as e:
+            print(f"  ⚠️ Error capturing clicks: {e}. Keeping original doctor label.")
+        plt.close(fig)
+
+    elif user_input == 'y':
         print("  ✅ Accepted! AI boundaries saved to Silver Standard.")
         Y_working[seg_idx] = ai_preds.reshape(960, 1)
         corrections_made += 1
+        plt.close(fig)
+        
     elif user_input == 'r':
         print(f"  🤔 Flagged Segment {seg_idx} for RLHF.")
         rlhf_queue.append(seg_idx)
+        plt.close(fig)
+        
     elif user_input == 'q':
+        plt.close(fig)
         break
+        
     else:
         print("  ❌ Rejected. Keeping original doctor label.")
+        plt.close(fig)
 
 # --- FINAL SAVE AND CLEANUP ---
 np.save(silver_y_path, Y_working)
