@@ -156,8 +156,8 @@ def run_multi_night_evaluation(model, test_nights, target_type, device):
 # ==========================================
 if __name__ == "__main__":
     TEST_NIGHTS = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]  
-    TEST_TARGET = 'OSA'  
-    MODEL_TYPE= 'DPO'
+    TEST_TARGET = 'CA'  
+    MODEL_TYPE= 'SFT'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ConvLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
     if MODEL_TYPE=='SFT':
