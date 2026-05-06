@@ -22,19 +22,18 @@ except ImportError as e:
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'OSA'
+TARGET_TYPE = 'CA'
 
 PREF_DATA_PATHS = [
-    f'dpo_automined_{TARGET_TYPE}_pairs.npy',
-    f'dpo_preferences_n12.npy'
+    f'dpo_automined_{TARGET_TYPE}_pairs.npy'
     ]
 
 SFT_WEIGHTS_PATH = os.path.join(parent_dir, f'penta_lstm_{TARGET_TYPE}_weights.pth')
 DPO_WEIGHTS_PATH = os.path.join(parent_dir, f'penta_lstm_{TARGET_TYPE}_DPO_weights.pth')
 
 PAIR_WEIGHTS = {
-    'detection': 0.40,   # Idea 1: Fix Missed Apneas
-    'suppression': 0.15, # Idea 2: Fix Hallucinations
+    'detection': 0.60,   # Idea 1: Fix Missed Apneas
+    'suppression': 0.05, # Idea 2: Fix Hallucinations
     'boundary': 0.05     # The original boundary jitter
 }
 

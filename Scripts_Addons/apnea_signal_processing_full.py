@@ -10,12 +10,12 @@ from sklearn.preprocessing import StandardScaler
 print("1. Loading and cleaning full night data...")
 
 NO_OF_CHANNELS=7
-NIGHT_TEST=20
+NIGHT_TEST=25
 if NO_OF_CHANNELS==6:
     df = pd.read_csv('Data\ON030217-06.csv', 
                  names=['PFlow', 'Thorax', 'Abdomen', 'SaO2', 'Vitalog1', 'Vitalog2', 'time_sec'])
 elif NO_OF_CHANNELS== 7:
-    df = pd.read_csv('Data/KAB090417-05.csv', 
+    df = pd.read_csv('Data/PAR220317-05.csv', 
                  names=['PFlow', 'Thorax', 'Abdomen', 'SaO2', 'Vitalog1', 'Vitalog2','ECG', 'time_sec'])
 else:
     df = pd.read_csv('Data/ASK051016-08.csv', 

@@ -4,15 +4,15 @@ import os
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-NIGHT_ID = 8
+NIGHT_ID = 25
 SAMPLING_RATE = 32 # 32 Hz
 
 osa_segments_path = f'Nights/Y_OSA_{NIGHT_ID}_ADJUSTED.npy'
 ca_segments_path = f'Nights/Y_CA_{NIGHT_ID}_ADJUSTED.npy'
 segment_times_path = f'Nights/segment_times_n{NIGHT_ID}.npy'
 
-original_txt_path = r'Data\8MI220916-06.TXT' 
-output_txt_path = f'8MI220916-06.TXT'
+original_txt_path = r'Data\PAR220317-05.TXT' 
+output_txt_path = f'PAR220317-05.TXT'
 # ==========================================
 
 def extract_events_from_array(npy_path, target_type, segment_times, min_time, total_samples):

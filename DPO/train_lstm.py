@@ -12,18 +12,18 @@ import mlflow
 TARGET_TYPE = 'OSA' 
 
 # 1. Dataset Splits
-TRAIN_NIGHTS = [1,2,3,4,7,8,10,11,12,14,15,16,18,19] 
-VAL_NIGHTS = [17, 6]        # Only used if USE_VALIDATION is True
-TEST_NIGHTS = [5,9,13]   # Nights to evaluate automatically after training
+TRAIN_NIGHTS = [1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 15, 18, 20, 24]
+VAL_NIGHTS = [7, 22]        # Only used if USE_VALIDATION is True
+TEST_NIGHTS = [4, 16, 21, 25]   # Nights to evaluate automatically after training
 
-#TRAIN_NIGHTS = [2,5,6,10,11,12,13,15,17,18] 
-#VAL_NIGHTS = [4,7]        # Only used if USE_VALIDATION is True
-#TEST_NIGHTS = [1,9]   # Nights to evaluate automatically after training
+#TRAIN_NIGHTS = [1,2,5,6,7,9,10,11,12,13,15,17] 
+#VAL_NIGHTS = [18]        # Only used if USE_VALIDATION is True
+#TEST_NIGHTS = [4,12]   # Nights to evaluate automatically after training
 # 2. Training Settings
 USE_VALIDATION = True 
 MAX_EPOCHS = 50
 PATIENCE = 20          
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.003
 
 # 3. PU Learning & Loss Weights
 CLASS_WEIGHT_NORMAL = 1.0
@@ -127,16 +127,22 @@ def train_model():
         
         print("\n--- Preparing Training Set ---")
         train_dataset = MultiNightApneaDataset(TRAIN_NIGHTS, TARGET_TYPE)
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=256, shuffle=True)
         
         if USE_VALIDATION:
             print("\n--- Preparing Validation Set ---")
             val_dataset = MultiNightApneaDataset(VAL_NIGHTS, TARGET_TYPE) 
-            val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+            val_loader = DataLoader(val_dataset, batch_size=256, shuffle=False)
         else:
             print("\n--- Validation/Early Stopping is DISABLED ---")
         
         model = ConvLSTM().to(device)
+        
+        # --- MULTI-GPU ACTIVATION ---
+        if torch.cuda.device_count() > 1:
+            print(f"🔥 Activating Multi-GPU Training using {torch.cuda.device_count()} GPUs!")
+            model = nn.DataParallel(model)
+            
         class_weights = torch.tensor([CLASS_WEIGHT_NORMAL, CLASS_WEIGHT_APNEA], dtype=torch.float32).to(device)
         criterion = SimulatedPULoss(class_weights=class_weights, pu_discount=PU_DISCOUNT)
         optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
@@ -189,7 +195,10 @@ def train_model():
                 if avg_val_loss < best_val_loss:
                     best_val_loss = avg_val_loss
                     epochs_without_improvement = 0
-                    best_model_weights = copy.deepcopy(model.state_dict())
+                    if isinstance(model, nn.DataParallel):
+                        best_model_weights = copy.deepcopy(model.module.state_dict())
+                    else:
+                        best_model_weights = copy.deepcopy(model.state_dict())
                     print(f"   -> [New Best State Saved]")
                 else:
                     epochs_without_improvement += 1
@@ -200,13 +209,25 @@ def train_model():
                         break
             else:
                 print(f"Epoch {epoch+1:03d} | Train Loss: {avg_train_loss:.4f} | (No Validation)")
-                best_model_weights = copy.deepcopy(model.state_dict())
+                if isinstance(model, nn.DataParallel):
+                    best_model_weights = copy.deepcopy(model.module.state_dict())
+                else:
+                    best_model_weights = copy.deepcopy(model.state_dict())
 
         # Save Final Best Weights
         save_name = f'penta_lstm_{TARGET_TYPE}_weights.pth'
+        
         if best_model_weights is not None:
-            model.load_state_dict(best_model_weights) 
-        torch.save(model.state_dict(), save_name)
+            if isinstance(model, nn.DataParallel):
+                model.module.load_state_dict(best_model_weights)
+            else:
+                model.load_state_dict(best_model_weights)
+                
+        # Always save the unwrapped state_dict so other scripts don't break
+        if isinstance(model, nn.DataParallel):
+            torch.save(model.module.state_dict(), save_name)
+        else:
+            torch.save(model.state_dict(), save_name)
         
         # --- 2. LOG ARTIFACTS TO MLFLOW ---
         mlflow.log_artifact(save_name)

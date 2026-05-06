@@ -5,12 +5,12 @@ import os
 # --- CONFIGURATION ---
 # ==========================================
 TARGET_TYPES = ['OSA', 'CA'] 
-NIGHT_ID = 12
+NIGHT_ID = 25
 SAMPLING_RATE = 32 # 32 Hz
 
 segment_times_path = f'Nights/segment_times_n{NIGHT_ID}.npy'
-original_txt_path = r'Data/CGK180916-05.TXT' 
-output_txt_path = f'CGK180916-05.TXT'
+original_txt_path = r'Data/PAR220317-05.TXT' 
+output_txt_path = f'PAR220317-05.TXT'
 # ==========================================
 
 def process_target_data(target_type, segment_times, min_time, total_samples):
