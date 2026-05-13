@@ -5,8 +5,8 @@ import os
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'CA'    
-NIGHT_ID = 25
+TARGET_TYPE = 'OSA'    
+NIGHT_ID = 35
 SAMPLING_RATE = 32 
 
 silver_path = f'Nights\\Y_{TARGET_TYPE}_{NIGHT_ID}_SILVER.npy'

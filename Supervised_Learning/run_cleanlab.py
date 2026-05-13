@@ -10,15 +10,15 @@ import gc
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'CA'    
-MODEL_TYPE = 'SFT'
+TARGET_TYPE = 'OSA'    
+MODEL_TYPE = 'DPO'
 
 if MODEL_TYPE == 'SFT':
     CLEAN_TEACHER_WEIGHTS = f'penta_lstm_{TARGET_TYPE}_weights.pth' 
 else:
     CLEAN_TEACHER_WEIGHTS = f'penta_lstm_{TARGET_TYPE}_{MODEL_TYPE}_weights.pth'
 
-NOISY_NIGHTS = [21,22, 23,24,25] 
+NOISY_NIGHTS = [26,27,28,29,30,31,32,33,34,35] 
 # ==========================================
 
 def process_single_night(night_id, agent, device):
