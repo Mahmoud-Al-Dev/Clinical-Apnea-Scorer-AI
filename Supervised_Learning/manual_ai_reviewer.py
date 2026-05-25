@@ -8,8 +8,8 @@ from train_lstm import ConvLSTM
 # ==========================================
 # --- USER CONTROLS ---
 # ==========================================
-TARGET_TYPE = 'OSA'  
-NIGHT_ID = 20
+TARGET_TYPE = 'CA'  
+NIGHT_ID = 29
 # ==========================================
 
 print(f"--- Launching Manual AI Reviewer for {TARGET_TYPE} Night {NIGHT_ID} ---")

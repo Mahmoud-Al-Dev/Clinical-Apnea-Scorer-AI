@@ -5,14 +5,21 @@ import os
 # --- USER CONTROLS ---
 # ==========================================
 # List of night IDs you want to process
-TEST_NIGHTS = [26, 27, 28]  
+TEST_NIGHTS = [26, 27, 28, 29, 30, 31 ,32 ,33, 34,35]  
 
 # Corresponding list of clinical text files. 
 # Index 0 matches TEST_NIGHTS[0], Index 1 matches TEST_NIGHTS[1], etc.
 TXT_FILE_PATHS = [
-    'Data/AB100417-05.TXT',  # Corresponds to Night 26
-    'Data/AD221116-05.TXT',  # Corresponds to Night 27
-    'Data/AL150117-10.TXT'   # Corresponds to Night 28
+    'Data/QBG070517-06.TXT',    # Corresponds to your 1st test night
+    'Data/RBH061016-06.TXT',    # Corresponds to your 2nd test night
+    'Data/SBH071016-06.TXT',    # Corresponds to your 3rd test night
+    'Data/TCD171116-05.TXT',    # Corresponds to your 4th test night
+    'Data/UCR201116-06(2).TXT', # Corresponds to your 5th test night
+    'Data/VCR211116-06.TXT',    # Corresponds to your 6th test night
+    'Data/WCS210317-06.TXT',    # Corresponds to your 7th test night
+    'Data/XCS220317-06.TXT',    # Corresponds to your 8th test night
+    'Data/YDD010217-06.TXT',    # Corresponds to your 9th test night
+    'Data/ZED270417-05.TXT'     # Corresponds to your 10th test night
 ]
 # ==========================================
 

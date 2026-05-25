@@ -21,8 +21,8 @@ except ImportError as e:
 # ==========================================
 # --- CONFIGURATION ---
 # ==========================================
-TARGET_TYPE = 'CA'    
-CLEAN_TRAIN_NIGHTS = [2, 5, 6, 7, 13, 15, 18, 22, 24, 25]
+TARGET_TYPE = 'OSA'    
+CLEAN_TRAIN_NIGHTS = [1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 15, 20, 21, 24, 25, 26, 30, 31, 32, 33]
 
 SFT_WEIGHTS_PATH = os.path.join(parent_dir, f'penta_lstm_{TARGET_TYPE}_weights.pth')
 OUTPUT_FILE = f'dpo_automined_{TARGET_TYPE}_pairs.npy'
