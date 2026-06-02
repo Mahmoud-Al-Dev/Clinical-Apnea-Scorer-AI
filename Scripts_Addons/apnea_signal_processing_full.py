@@ -242,7 +242,7 @@ for night_id, file_path, num_channels in NIGHTS_TO_PROCESS:
     # =============================================================
     print("6. Extracting core channels and saving...")
 
-    core_indices = [3, 4, 5, 11, 14, 15, 17, 18] 
+    core_indices = [3, 4, 5, 11, 14, 15, 21, 22] 
     X_train = normalized_segments[:, :, core_indices]
 
     x_save_path = os.path.join(OUTPUT_FOLDER, f'X_{night_id}.npy')

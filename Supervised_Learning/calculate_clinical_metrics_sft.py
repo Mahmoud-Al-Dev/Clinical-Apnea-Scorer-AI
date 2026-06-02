@@ -57,7 +57,7 @@ def evaluate_full_night(model, night_num, target_type, device):
     model.eval()
     
     # 1. Load Data
-    X = np.load(f'Nights/X_{night_num}.npy')
+    X = np.load(f'Nights_Vitalog/X_{night_num}.npy')
     
     # SMART LOAD: Use Silver Standard if available to get mathematically accurate metrics
     silver_path = f'Nights/Y_{target_type}_{night_num}_SILVER.npy'
@@ -155,15 +155,16 @@ def run_multi_night_evaluation(model, test_nights, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__": 
-    TEST_NIGHTS = [4,11,29]
+    TEST_NIGHTS = [1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35]
     TEST_TARGET = 'CA'  
     MODEL_TYPE= 'SFT'
+    MODEL_NAME= 'Vitalog'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = ConvLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
     if MODEL_TYPE=='SFT':
-        weights_path = f'penta_lstm_{TEST_TARGET}_weights.pth'
+        weights_path = f'penta_lstm_{TEST_TARGET}_{MODEL_NAME}_weights.pth'
     else:
-        weights_path = f'penta_lstm_{TEST_TARGET}_{MODEL_TYPE}_weights.pth'
+        weights_path = f'penta_lstm_{TEST_TARGET}_{MODEL_TYPE}_{MODEL_NAME}_weights.pth'
     
     try:
         model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
