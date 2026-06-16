@@ -33,7 +33,6 @@ class MultiNightApneaDataset(Dataset):
     def __getitem__(self, idx): return self.x[idx, :, self.ai_indices], self.y[idx]
 
 class ConvLSTM(nn.Module):
-    # (Keep your exact ConvLSTM architecture here as defined in train_lstm.py)
     def __init__(self, input_size=6, hidden_size=128, num_layers=2):
         super(ConvLSTM, self).__init__()
         self.cnn = nn.Sequential(
