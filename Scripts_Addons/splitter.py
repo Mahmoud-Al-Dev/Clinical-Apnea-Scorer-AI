@@ -17,12 +17,12 @@ def split_csv_night(file_path, num_splits, output_dir):
     # Extract the base filename without the '.csv' extension (e.g., 'ZED270417-05')
     base_name = os.path.basename(file_path).replace('.csv', '')
 
-    print(f"🚀 Loading {file_path}...")
+    print(f" Loading {file_path}...")
     try:
         # Read the CSV completely raw (header=None prevents it from eating the first row)
         df = pd.read_csv(file_path, header=None)
     except FileNotFoundError:
-        print(f"❌ Error: File {file_path} not found.")
+        print(f" Error: File {file_path} not found.")
         return
 
     total_rows = len(df)
@@ -32,7 +32,7 @@ def split_csv_night(file_path, num_splits, output_dir):
     # np.array_split safely handles remainders if total_rows isn't perfectly divisible by 5
     chunks = np.array_split(df, num_splits)
 
-    print(f"📂 Splitting into {num_splits} equal files...")
+    print(f" Splitting into {num_splits} equal files...")
     
     # 3. Save each chunk
     for i, chunk in enumerate(chunks):
@@ -43,7 +43,7 @@ def split_csv_night(file_path, num_splits, output_dir):
         chunk.to_csv(output_file, index=False, header=False)
         print(f"   ✅ Saved: {output_file} ({len(chunk)} rows)")
 
-    print(f"\n🎉 Split complete! All files saved in '{output_dir}/'")
+    print(f"\n Split complete! All files saved in '{output_dir}/'")
 
 if __name__ == "__main__":
     split_csv_night(INPUT_FILE, NUM_SPLITS, OUTPUT_FOLDER)
