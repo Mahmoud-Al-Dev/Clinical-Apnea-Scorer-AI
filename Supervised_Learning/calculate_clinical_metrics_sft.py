@@ -4,6 +4,8 @@ import os
 from scipy.ndimage import label
 from train_lstm import ConvLSTM 
 
+FOLDER_NAME = 'Nights'
+NO_OF_CHANNELS=6
 def apply_cleanup_filter(predictions, min_length_frames=320):
     cleaned = np.copy(predictions)
     labeled_array, num_features = label(cleaned == 1)
@@ -57,14 +59,14 @@ def evaluate_full_night(model, night_num, target_type, device):
     model.eval()
     
     # 1. Load Data
-    X = np.load(f'Nights_Vitalog/X_{night_num}.npy')
+    X = np.load(f'{FOLDER_NAME}/X_{night_num}.npy')
     
     # SMART LOAD: Use Silver Standard if available to get mathematically accurate metrics
-    silver_path = f'Nights/Y_{target_type}_{night_num}_SILVER.npy'
+    silver_path = f'{FOLDER_NAME}/Y_{target_type}_{night_num}_SILVER.npy'
     if os.path.exists(silver_path):
         Y_true = np.load(silver_path)
     else:
-        Y_true = np.load(f'Nights/Y_{target_type}_{night_num}.npy')
+        Y_true = np.load(f'{FOLDER_NAME}/Y_{target_type}_{night_num}.npy')
     
     ai_indices = [0, 3, 4, 5, 6, 7]
     num_segments = len(X)
@@ -155,12 +157,12 @@ def run_multi_night_evaluation(model, test_nights, target_type, device):
 # --- STANDALONE TESTER ---
 # ==========================================
 if __name__ == "__main__": 
-    TEST_NIGHTS = [1,2,3,4,5,6,7,8,9,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35]
+    TEST_NIGHTS = [4,11,26,29]
     TEST_TARGET = 'CA'  
     MODEL_TYPE= 'SFT'
-    MODEL_NAME= 'Vitalog'
+    MODEL_NAME= 'Standard'
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = ConvLSTM(input_size=6, hidden_size=128, num_layers=2).to(device)
+    model = ConvLSTM(input_size=NO_OF_CHANNELS, hidden_size=128, num_layers=2).to(device)
     if MODEL_TYPE=='SFT':
         weights_path = f'penta_lstm_{TEST_TARGET}_{MODEL_NAME}_weights.pth'
     else:

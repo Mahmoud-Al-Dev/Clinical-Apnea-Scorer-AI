@@ -10,30 +10,32 @@ import mlflow
 # --- USER CONTROLS ---
 # =================================================================
 TARGET_TYPE = 'CA' 
+MODEL_NAME = 'Vitalog_2'
 
-# 1. Dataset Splits
-#TRAIN_NIGHTS = [1, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 15, 18, 20, 24]
-#VAL_NIGHTS = [7, 22]        # Only used if USE_VALIDATION is True
-#TEST_NIGHTS = [4, 16, 21, 25]   # Nights to evaluate automatically after training
+if TARGET_TYPE == 'CA':
+    TRAIN_NIGHTS = [2, 5, 6, 7, 9, 12, 13, 15, 18, 22, 24, 25, 28, 30, 32, 33]
+    VAL_NIGHTS = [4, 26]        
+    TEST_NIGHTS = [11, 29]   
+else:
+    TRAIN_NIGHTS = [1, 2, 5, 6, 7, 8, 9, 11, 12, 15, 20, 21, 24, 25, 26, 30, 31, 32, 33]
+    VAL_NIGHTS = [3, 18]        
+    TEST_NIGHTS = [13, 16, 22]   
 
-TRAIN_NIGHTS = [2, 5, 6, 7, 13, 15, 18, 22, 24, 25]
-VAL_NIGHTS = [10, 12]        # Only used if USE_VALIDATION is True
-TEST_NIGHTS = [4, 9, 11]   # Nights to evaluate automatically after training
 
 # 2. Training Settings
 USE_VALIDATION = True 
 MAX_EPOCHS = 50
 PATIENCE = 20          
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.004367
 
-# 3. PU Learning & Loss Weights
+# 3. PU Learning & Loss Weightsw
 CLASS_WEIGHT_NORMAL = 1.0
-CLASS_WEIGHT_APNEA = 3.5
-PU_DISCOUNT = 0.40
+CLASS_WEIGHT_APNEA = 2.07197
+PU_DISCOUNT = 0.3101045
 # =================================================================
 
 class MultiNightApneaDataset(Dataset):
-    def __init__(self, nights_list, target_type, folder="Nights"): 
+    def __init__(self, nights_list, target_type, folder="Nights_Vitalog_Blind_Model"): 
         x_list = []
         y_list = []
         
@@ -59,13 +61,13 @@ class MultiNightApneaDataset(Dataset):
             
         self.x = torch.tensor(np.concatenate(x_list, axis=0), dtype=torch.float32)
         self.y = torch.tensor(np.concatenate(y_list, axis=0), dtype=torch.long).squeeze(-1)
-        self.ai_indices = [0, 3, 4, 5, 6, 7]
+        self.ai_indices = [0, 3]
         
     def __len__(self): return len(self.x)
     def __getitem__(self, idx): return self.x[idx, :, self.ai_indices], self.y[idx]
 
 class ConvLSTM(nn.Module):
-    def __init__(self, input_size=6, hidden_size=128, num_layers=2):
+    def __init__(self, input_size=2, hidden_size=128, num_layers=2):
         super(ConvLSTM, self).__init__()
         self.cnn = nn.Sequential(
             nn.Conv1d(in_channels=input_size, out_channels=32, kernel_size=7, padding=3),
@@ -204,7 +206,7 @@ def train_model():
                 best_model_weights = copy.deepcopy(model.state_dict())
 
         # Save Final Best Weights
-        save_name = f'penta_lstm_{TARGET_TYPE}_weights.pth'
+        save_name = f'penta_lstm_{TARGET_TYPE}_{MODEL_NAME}_weights.pth'
         if best_model_weights is not None:
             model.load_state_dict(best_model_weights) 
         torch.save(model.state_dict(), save_name)
